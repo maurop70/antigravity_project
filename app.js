@@ -412,6 +412,17 @@ function setupEventListeners() {
                 const event = { type: "MACRO", headline: "Flash Crash: SPX down 3% in minutes.", severity: "CRITICAL", impact_score: -10 };
                 const result = ALPHA_BRAIN.processEvent(event, AGENT_DATA.active_trade);
                 response = result ? result.message : "Alert sent.";
+
+                // TRIGGER DESKTOP ALERT
+                if (result) triggerDesktopAlert({
+                    type: "CRITICAL ALERT",
+                    headline: event.headline,
+                    message: "Thesis Invalidated. Immediate Exit Recommended."
+                });
+            }
+            // INTELLIGENT RESPONSES
+            else if (text.toLowerCase().includes("why") && (text.toLowerCase().includes("closer") || text.toLowerCase().includes("strike") || text.toLowerCase().includes("selling"))) {
+                response = "<strong>Strategy Insight:</strong><br>Selling strikes closer to the current price (ATM) would generate more premium, but it drastically increases <strong>Gamma Risk</strong>.<br><br>My algorithm specifically selects strikes outside the <strong>Expected Move (MMM)</strong> to maintain a >85% Probability of Profit. Moving closer violates the 'Safe Zone' buffer and exposes us to rapid losses if volatility expands.";
             }
             else if (text.toLowerCase().includes("risk")) {
                 response = "Current risk is defined at $47.90 max loss per contract (due to 50pt wide Put Spread).";
@@ -422,8 +433,12 @@ function setupEventListeners() {
             } else if (text.toLowerCase().includes("close")) {
                 response = "I will alert you when we reach 50% profit. If we hit that on Wednesday, we will close and rescan.";
             }
+            // CATCH-ALL
+            else {
+                response = "I am currently scanning the global feed. I can explain my <strong>Strike Selection</strong>, <strong>Risk Logic</strong>, or run <strong>Simulations</strong> (e.g. 'simulate war').";
+            }
             appendMessage('agent', response);
-        }, 1000); // Reduced latency for snappy feel
+        }, 800); // Reduced latency for snappy feel
     };
 
     // Capital Input Listener
