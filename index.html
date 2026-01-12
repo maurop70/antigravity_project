@@ -44,17 +44,17 @@
                 <div class="market-ticker">
                     <div class="ticker-item">
                         <span class="symbol">SPX</span>
-                        <span class="price">6966.28</span>
-                        <span class="change positive">+0.65%</span>
+                        <span class="price" id="ticker-spx">6966.28</span>
+                        <span class="change positive" id="ticker-spx-change">+0.65%</span>
                     </div>
                     <div class="ticker-item">
                         <span class="symbol">VIX</span>
-                        <span class="price">14.49</span>
-                        <span class="change negative">-2.10%</span>
+                        <span class="price" id="ticker-vix">14.49</span>
+                        <span class="change negative" id="ticker-vix-change">-2.10%</span>
                     </div>
                     <div class="ticker-item">
                         <span class="symbol">IV RANK</span>
-                        <span class="price">18</span>
+                        <span class="price" id="ticker-ivr">18</span>
                         <span class="change neutral">LOW</span>
                     </div>
                 </div>
@@ -63,6 +63,39 @@
                     <div class="avatar">T</div>
                 </div>
             </header>
+
+            <!-- REAL DATA INPUT PANEL -->
+            <div class="market-config-panel"
+                style="background: rgba(30, 41, 59, 0.5); border-bottom: 1px solid #333; padding: 10px 20px; display: flex; gap: 20px; align-items: center; margin-bottom: 20px;">
+                <div style="font-size: 0.75rem; color: #00ff9d; font-weight: bold; font-family: 'JetBrains Mono';">
+                    MANUAL MARKET DATA:</div>
+
+                <div class="config-item">
+                    <label style="color: #64748b; font-size: 0.7rem; margin-right: 5px;">SPX Price:</label>
+                    <input type="number" id="input-spx" value="6966.28"
+                        style="background: #0f172a; border: 1px solid #475569; color: #fff; width: 80px; padding: 2px 5px;">
+                </div>
+
+                <div class="config-item">
+                    <label style="color: #64748b; font-size: 0.7rem; margin-right: 5px;">VIX:</label>
+                    <input type="number" id="input-vix" value="14.49"
+                        style="background: #0f172a; border: 1px solid #475569; color: #fff; width: 60px; padding: 2px 5px;">
+                </div>
+
+                <div class="config-item">
+                    <label style="color: #64748b; font-size: 0.7rem; margin-right: 5px;">Bias:</label>
+                    <select id="input-bias"
+                        style="background: #0f172a; border: 1px solid #475569; color: #fff; padding: 2px 5px;">
+                        <option value="Bullish">Bullish</option>
+                        <option value="Neutral">Neutral</option>
+                        <option value="Bearish">Bearish</option>
+                    </select>
+                </div>
+
+                <button onclick="updateMarketData()"
+                    style="background: #00ff9d; color: #000; border: none; padding: 4px 12px; font-weight: bold; font-size: 0.75rem; cursor: pointer; margin-left: auto;">UPDATE
+                    ALPHA</button>
+            </div>
 
             <!-- Dashboard Grid -->
             <div class="dashboard-grid">
