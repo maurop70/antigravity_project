@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpha | Direct Uplink</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050505;
+            color: #e0e0e0;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 800px;
+            background: #0a0b0e;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid #1a1a1a;
+            border-right: 1px solid #1a1a1a;
+        }
+
+        .header {
+            padding: 20px;
+            border-bottom: 1px solid #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(10, 11, 14, 0.95);
+        }
+
+        .header h1 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.2rem;
+            margin: 0;
+            color: #00ff9d;
+        }
+
+        .status-dot {
+            height: 8px;
+            width: 8px;
+            background-color: #00ff9d;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ff9d;
+        }
+
+        .chat-feed {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .message {
+            max-width: 80%;
+            line-height: 1.5;
+            font-size: 1rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background: #1e293b;
+            padding: 12px 18px;
+            border-radius: 12px 12px 0 12px;
+            color: #fff;
+        }
+
+        .message.agent {
+            align-self: flex-start;
+            color: #b0b0b0;
+            padding: 0 10px;
+            border-left: 2px solid #00ff9d;
+        }
+
+        .input-area {
+            padding: 20px;
+            background: #0a0b0e;
+            border-top: 1px solid #1a1a1a;
+        }
+
+        .input-box {
+            width: 100%;
+            background: #161b22;
+            border: 1px solid #30363d;
+            padding: 15px;
+            border-radius: 8px;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-box:focus {
+            border-color: #00ff9d;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0b0e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="chat-container">
+        <div class="header">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div class="status-dot"></div>
+                <h1>ALPHA INTELLIGENCE</h1>
+            </div>
+            <div style="font-size: 0.8rem; color: #666;">LOCAL SECURE LINK</div>
+        </div>
+
+        <div class="chat-feed" id="feed">
+            <div class="message agent">
+                I am online. Direct link established.<br>
+                I have access to the full strategy engine. What is your command?
+            </div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="userInput" class="input-box" placeholder="Message Alpha..." autofocus>
+        </div>
+    </div>
+
+    <!-- DATA & BRAIN -->
+    <script src="data.js"></script>
+    <script src="alpha_feed.js"></script>
+    <script src="alpha_brain.js"></script>
+
+    <script>
+        const feed = document.getElementById('feed');
+        const input = document.getElementById('userInput');
+
+        function addMessage(text, sender) {
+            const div = document.createElement('div');
+            div.classList.add('message', sender);
+            div.innerHTML = text; // Allow HTML for bolding/formatting
+            feed.appendChild(div);
+            feed.scrollTop = feed.scrollHeight;
+        }
+
+        function processInput() {
+            const text = input.value.trim();
+            if (!text) return;
+
+            // User Message
+            addMessage(text, 'user');
+            input.value = '';
+
+            // Agent Logic (Simulate delay)
+            setTimeout(() => {
+                let response = "";
+                const lowerI = text.toLowerCase();
+
+                // 1. Direct Brain Queries
+                if (lowerI.includes("status") || lowerI.includes("report")) {
+                    response = `**Market Status:** SPX ${AGENT_DATA.market.spx}. VIX ${AGENT_DATA.market.vix}.<br>
+                            **Thesis:** ${AGENT_DATA.active_trade.thesis}<br>
+                            **Forecast:** ${AGENT_DATA.forecast.direction} (${(AGENT_DATA.forecast.probability * 100).toFixed(0)}%)`;
+                }
+                else if (lowerI.includes("risk")) {
+                    response = "Gamma Risk is currently manageable but monitoring the 6800 Put wall. If SPX drops below 6900, we must roll the Puts.";
+                }
+                else if (lowerI.includes("trade") || lowerI.includes("position")) {
+                    const legs = AGENT_DATA.active_trade.legs;
+                    response = `Active Iron Condor structure:<br>
+                            - Short Call: ${legs[0].strike}<br>
+                            - Short Put: ${legs[2].strike}<br>
+                            Status: ${AGENT_DATA.active_trade.status}`;
+                }
+                // 2. Alpha Brain Fallback (Using the imported logic if available)
+                else if (typeof ALPHA_BRAIN !== "undefined" && ALPHA_BRAIN.processEvent) {
+                    // Determine if it's a simulation request or general chat
+                    if (lowerI.includes("sim")) {
+                        const evt = { headline: "User Simulation: " + text, type: "USER_SIM" };
+                        const res = ALPHA_BRAIN.processEvent(evt, AGENT_DATA.active_trade);
+                        response = res ? res.message : "Simulation complete. No critical impact found.";
+                    } else {
+                        response = "I am processing. I can run simulations or analyze risk properties. Try asking about 'Status', 'Risk', or 'Simulate Crash'.";
+                    }
+                } else {
+                    response = "Command received. Monitoring parameters.";
+                }
+
+                addMessage(response, 'agent');
+            }, 600);
+        }
+
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') processInput();
+        });
+
+    </script>
+</body>
+
+</html>
