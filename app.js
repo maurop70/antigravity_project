@@ -421,8 +421,12 @@ function setupEventListeners() {
                 });
             }
             // INTELLIGENT RESPONSES
-            else if (text.toLowerCase().includes("why") && (text.toLowerCase().includes("closer") || text.toLowerCase().includes("strike") || text.toLowerCase().includes("selling"))) {
-                response = "<strong>Strategy Insight:</strong><br>Selling strikes closer to the current price (ATM) would generate more premium, but it drastically increases <strong>Gamma Risk</strong>.<br><br>My algorithm specifically selects strikes outside the <strong>Expected Move (MMM)</strong> to maintain a >85% Probability of Profit. Moving closer violates the 'Safe Zone' buffer and exposes us to rapid losses if volatility expands.";
+            // Matches: "Why...", "What if I sell...", "6890", "closer strike"
+            else if (
+                (text.toLowerCase().includes("why") || text.toLowerCase().includes("what if") || text.toLowerCase().includes("sell")) &&
+                (text.toLowerCase().includes("closer") || text.toLowerCase().includes("strike") || text.toLowerCase().includes("put") || text.toLowerCase().includes("6890"))
+            ) {
+                response = "<strong>Analysis of Strike (e.g. 6890):</strong><br>Selling closer to the money (ATM) drastically increases <strong>Gamma Risk</strong>.<br><br>While you collect more premium, a 1% move in SPX could wipe out that profit instantly. My algorithm selects strikes (Safe Zone) that stay outside the <strong>Market Maker Move</strong> to ensure survival.";
             }
             else if (text.toLowerCase().includes("risk")) {
                 response = "Current risk is defined at $47.90 max loss per contract (due to 50pt wide Put Spread).";
@@ -435,7 +439,7 @@ function setupEventListeners() {
             }
             // CATCH-ALL
             else {
-                response = "I am currently scanning the global feed. I can explain my <strong>Strike Selection</strong>, <strong>Risk Logic</strong>, or run <strong>Simulations</strong> (e.g. 'simulate war').";
+                response = "I didn't quite catch that. I am scanning global feeds, but I can discuss <strong>Strikes</strong>, <strong>Risk</strong>, or run <strong>Simulations</strong>.";
             }
             appendMessage('agent', response);
         }, 800); // Reduced latency for snappy feel
