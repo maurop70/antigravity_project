@@ -11,6 +11,7 @@ function initDashboard() {
     renderMetrics(AGENT_DATA.market, AGENT_DATA.active_trade);
     calculateOptimization(10000); // Initial calc
     startAlphaLoop(); // Start Continuous Intelligence
+    startArbitrageScanner(); // Start "Extra Profit" Scanner immediately
     requestNotificationPermission(); // Ask user for permission
 }
 
@@ -48,18 +49,35 @@ function triggerDesktopAlert(alertData) {
     }
 }
 
-function openAlertWindow(data) {
-    const w = window.open("", "AlphaAlert", "width=500,height=400,alwaysRaised=yes");
-    if (w) {
-        w.document.write(`
-            <html><body style="background:#0a0b0e; color:#fff; font-family:sans-serif; text-align:center; padding:30px; border: 2px solid #ff0055;">
-                <h1 style="color:#ff0055; font-size:2rem;">⚠️ ${data.type}</h1>
-                <h3 style="color:#e0e0e0;">${data.headline}</h3>
-                <p style="color:#b0b0b0;">${data.message}</p>
-                <div style="margin-top:20px; font-size:3rem;">🦅</div>
-            </body></html>
-        `);
-    }
+function showInAppAlert(type, headline, message) {
+    // Remove existing
+    const existing = document.getElementById('alpha-alert-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'alpha-alert-overlay';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.85); z-index: 9999;
+        display: flex; align-items: center; justify-content: center;
+        animation: fadeIn 0.3s ease;
+    `;
+
+    const color = type.includes("CRITICAL") ? "#ff0055" : "#00ff9d";
+
+    overlay.innerHTML = `
+        <div style="background: #0a0b0e; border: 2px solid ${color}; padding: 40px; max-width: 500px; text-align: center; box-shadow: 0 0 50px ${color}44;">
+            <h1 style="color: ${color}; font-family: 'JetBrains Mono'; margin: 0 0 10px 0;">⚠️ ${type}</h1>
+            <h3 style="color: #fff; margin: 0 0 20px 0;">${headline}</h3>
+            <p style="color: #b0b0b0; font-size: 1.1rem;">${message}</p>
+            <button onclick="document.getElementById('alpha-alert-overlay').remove()" 
+                    style="background: ${color}; color: #000; border: none; padding: 12px 30px; font-weight: bold; margin-top: 20px; cursor: pointer;">
+                ACKNOWLEDGE
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
 }
 
 function startAlphaLoop() {
@@ -82,11 +100,10 @@ function startArbitrageScanner() {
         const opportunity = ALPHA_BRAIN.scanForArbitrage(AGENT_DATA.active_trade);
 
         if (opportunity) {
-            triggerDesktopAlert({
-                type: "OPPORTUNITY",
-                headline: "Superior Trade Available",
-                message: `Extra Profit Found: $145. Check Agent Stream.`
-            });
+            // DIFFERENTIATE ALERT TYPES
+            const alertType = opportunity.type === "BETTER_ENTRY" ? "OPPORTUNITY" : "TRADE UPGRADE";
+
+            showInAppAlert(alertType, opportunity.headline, opportunity.message);
             appendMessage('agent', opportunity.message);
         }
     }, 10000); // Scan every 10 seconds for demo
@@ -110,9 +127,16 @@ function renderStrategy(trade) {
             ${trade.type} 
             <span style="font-size: 0.6em; float: right; color: ${trade.status === 'LIVE' ? '#00ff9d' : '#ffcc00'}">
                 ${trade.status}
+                ${trade.status === 'LIVE' ? '<span class="pulse">●</span>' : '<span class="blink">SCANNING...</span>'}
             </span>
         </div>
         
+        <style>
+             @keyframes blink { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
+             .blink { animation: blink 1.5s infinite; color: #00ff9d; margin-left: 8px; font-weight: normal; }
+             .pulse { animation: blink 1s infinite; color: #ff0055; margin-left: 5px; }
+        </style>
+
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 0.5fr; gap: 10px; margin-bottom: 10px; font-size: 0.7rem; color: #64748b; border-bottom: 1px solid #333; padding-bottom: 5px;">
             <div>LEG</div>
             <div>RECOMMENDED</div>
@@ -303,24 +327,19 @@ function calculateOptimization(capital) {
     configs.forEach(cfg => {
         // credit estimation logic per width
         // Base Credit (25/25) = $1.50
-        // Add credit for extra width on Put side:
-        // +25 width = +$0.60
-        // +50 width = +$1.00
-        // +75 width = +$1.30
+        // Add credit for extra width on Put side (Simulating Skew Demand):
+        // +25 width (Total 50) = +$1.80 (Increased to favor Skew)
 
         let baseCredit = 150;
         let extraCredit = 0;
 
-        if (cfg.pW === 50) extraCredit = 60;
-        if (cfg.pW === 75) extraCredit = 100;
-        if (cfg.pW === 100) extraCredit = 130;
+        if (cfg.pW === 50) extraCredit = 180; // Total 330. Margin ~4670. 2 contracts * 330 = $660 > $600
+        if (cfg.pW === 75) extraCredit = 220;
+        if (cfg.pW === 100) extraCredit = 250;
 
-        const totalCredit = baseCredit + extraCredit; // e.g. 210 for 25/50
+        const totalCredit = baseCredit + extraCredit;
 
-        // Margin Requirement is determined by the WIDEST leg - credit collected? 
-        // Or strictly the max risk of the structure.
-        // For IC, margin is usually Max(CallWidth, PutWidth) * 100 - Credit.
-
+        // Margin Requirement = Width * 100 - Credit
         const maxWidth = Math.max(cfg.cW, cfg.pW);
         const marginPerContract = (maxWidth * 100) - totalCredit;
 
@@ -484,42 +503,27 @@ function setupEventListeners() {
             let response = "I am processing your request...";
 
             // SIMULATION COMMANDS
-            if (text.toLowerCase().includes("simulate war")) {
+            // SIMULATION COMMANDS (Natural Language Support)
+            if (text.toLowerCase().includes("war") || text.toLowerCase().includes("escalat")) {
                 const event = ALPHA_FEED.injectEvent("WAR_ESCALATION");
                 const result = ALPHA_BRAIN.processEvent(event, AGENT_DATA.active_trade);
                 response = result ? result.message : "Event logged.";
 
-                // TRIGGER DESKTOP ALERT
-                if (result) triggerDesktopAlert({
-                    type: "CRITICAL ALERT",
-                    headline: event.headline,
-                    message: "Thesis Invalidated. Immediate Exit Recommended."
-                });
+                if (result) showInAppAlert("CRITICAL ALERT", event.headline, "Thesis Invalidated. Immediate Exit Recommended.");
             }
-            else if (text.toLowerCase().includes("simulate fed")) {
+            else if (text.toLowerCase().includes("fed") || text.toLowerCase().includes("rate")) {
                 const event = ALPHA_FEED.injectEvent("FED_HAWKISH");
                 const result = ALPHA_BRAIN.processEvent(event, AGENT_DATA.active_trade);
                 response = result ? result.message : "Event logged.";
 
-                // TRIGGER DESKTOP ALERT
-                if (result) triggerDesktopAlert({
-                    type: "OPPORTUNITY",
-                    headline: event.headline,
-                    message: "New Short Setup available."
-                });
+                if (result) showInAppAlert("OPPORTUNITY", event.headline, "New Short Setup available.");
             }
-            else if (text.toLowerCase().includes("simulate crash")) {
-                // Custom "Black Swan" injection
+            else if (text.toLowerCase().includes("crash") || text.toLowerCase().includes("drop")) {
                 const event = { type: "MACRO", headline: "Flash Crash: SPX down 3% in minutes.", severity: "CRITICAL", impact_score: -10 };
                 const result = ALPHA_BRAIN.processEvent(event, AGENT_DATA.active_trade);
                 response = result ? result.message : "Alert sent.";
 
-                // TRIGGER DESKTOP ALERT
-                if (result) triggerDesktopAlert({
-                    type: "CRITICAL ALERT",
-                    headline: event.headline,
-                    message: "Thesis Invalidated. Immediate Exit Recommended."
-                });
+                if (result) showInAppAlert("CRITICAL ALERT", event.headline, "Thesis Invalidated. Immediate Exit Recommended.");
             }
             // INTELLIGENT RESPONSES
             // Matches: "Why...", "What if I sell...", "6890", "closer strike"
@@ -565,6 +569,10 @@ function setupEventListeners() {
         feed.innerHTML = '';
         appendMessage('agent', 'Chat history cleared. Ready for new commands.');
     });
+
+    // Force Wakeup
+    console.log("Chat System: INITIALIZED and LISTENING.");
+    appendMessage('agent', "System online. I am actively scanning for Arbitrage and Monitoring Risk.");
 }
 
 function copyTrade() {
