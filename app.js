@@ -529,6 +529,19 @@ function setupEventListeners() {
 
                 if (result) showInAppAlert("CRITICAL ALERT", event.headline, "Thesis Invalidated. Immediate Exit Recommended.");
             }
+            // MACRO / GEOPOLITICS (User Specific: Oil, Venezuela)
+            else if (text.toLowerCase().includes("oil") || text.toLowerCase().includes("venezuela") || text.toLowerCase().includes("energy")) {
+                const event = ALPHA_FEED.injectEvent("ENERGY_SHOCK");
+                // Custom event props for visualization
+                event.headline = "Geopolitical Shift: Excess Oil Supply";
+
+                const result = ALPHA_BRAIN.processEvent(event, AGENT_DATA.active_trade);
+
+                // Manual Alert Trigger for "Access to Oil" -> Bearish/Stable for Energy, Bullish for Consumer Discretionary? 
+                // Let's assume this reduces inflation -> Bullish.
+                showInAppAlert("OPPORTUNITY", "Inflation Reduction Event", "Oil Supply expansion detected. Lower Energy costs = Bullish for SPX margins.");
+                response = "<strong>Macro Event Detected:</strong> Venezuela Oil Access.<br>IMPACT: Lower Oil Prices -> Lower CPI -> <strong>Very Bullish</strong> for SPX.<br><br>Recommendation: Hold or Add Long Deltas.";
+            }
             // INTELLIGENT RESPONSES
             // Matches: "Why...", "What if I sell...", "6890", "closer strike"
             else if (
