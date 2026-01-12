@@ -135,7 +135,7 @@ function renderStrategy(trade) {
                        value="${actualStrike}" 
                        class="strike-input" 
                        style="background: #0f172a; border: 1px solid #475569; color: #fff; width: 100%; border-radius: 4px; padding: 4px 6px; font-weight: bold; ${isLive ? 'border-color: #00ff9d;' : 'border-color: #64748b;'}"
-                       onchange="updateActualStrike(${index}, this.value)"
+                       oninput="updateActualStrike(${index}, this.value)"
                 >
             </div>
             <div style="color: #64748b; font-family: 'JetBrains Mono';">${leg.delta}</div>
