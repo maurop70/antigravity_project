@@ -162,8 +162,9 @@ function renderStrategy(trade) {
         aggressionColor = "#ff0055";
     }
 
-    // Editable Expiration Logic
-    const expiration = trade.expiration;
+    // Expiration Recommendation Logic
+    const recExpiration = getRecommendedExpiration();
+    const expiration = trade.expiration || recExpiration; // Default to recommended if null
 
     let html = `
     <div class="strategy-card">
@@ -175,12 +176,17 @@ function renderStrategy(trade) {
             </span>
         </div>
         
-        <div style="font-size: 0.75rem; color: #b0b0b0; margin-bottom: 12px; font-family: 'JetBrains Mono'; border-bottom: 1px solid #333; padding-bottom: 8px;">
-            EXPIRATION: 
-            <input type="text" value="${expiration}" 
-                   style="background: #1e293b; border: 1px solid #333; color: #fff; padding: 2px 6px; font-family: 'JetBrains Mono'; width: 140px; margin-left: 8px;"
-                   onchange="updateActualExpiration(this.value)"> 
-            <span style="color: #64748b; font-size: 0.7em;">(Edit)</span>
+        <!-- EXPIRATION ROW -->
+        <div style="font-size: 0.75rem; color: #b0b0b0; margin-bottom: 12px; font-family: 'JetBrains Mono'; border-bottom: 1px solid #333; padding-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <span style="color:#64748b; font-size:0.7rem;">RECOMMENDED:</span> <span style="color:#00ff9d; font-weight:bold;">${recExpiration}</span>
+            </div>
+            <div>
+                ACTUAL: 
+                <input type="text" value="${expiration}" 
+                       style="background: #1e293b; border: 1px solid #333; color: #fff; padding: 2px 6px; font-family: 'JetBrains Mono'; width: 100px; margin-left: 5px;"
+                       onchange="updateActualExpiration(this.value)"> 
+            </div>
         </div>
 
         <style>
@@ -255,6 +261,27 @@ function renderStrategy(trade) {
     `;
 
     if (container) container.innerHTML = html;
+}
+
+// Helper to calc best expiration (Next Friday > 3 days away)
+function getRecommendedExpiration() {
+    const today = new Date();
+    // Logic: Find next Friday. If next Friday is < 3 days, skip to next.
+    // Standard IC DTE is ~30-45, but this is an "Alpha" active trader.
+    // Let's target 7-14 days DTE.
+
+    let target = new Date(today);
+    target.setDate(today.getDate() + 7); // Start 1 week out
+
+    // Adjust to Friday
+    const day = target.getDay();
+    const diff = 5 - day; // 5 is Friday
+    target.setDate(target.getDate() + diff);
+
+    // Formatting: "Jan 19, 2026"
+    // Use user locale or hardcode 'en-US'
+    const options = { month: 'short', day: 'numeric', year: 'numeric' };
+    return target.toLocaleDateString('en-US', options);
 }
 
 // Logic to handle "Actual" updates
