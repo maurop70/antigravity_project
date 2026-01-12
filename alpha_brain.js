@@ -99,6 +99,43 @@ const ALPHA_BRAIN = {
         const loss = parseFloat(trade.metrics.max_risk.replace("$", ""));
         const pop = parseFloat(trade.metrics.pop) / 100;
         return (profit * pop) - (loss * (1 - pop));
+    },
+
+    // 5. Memory & Learning (New)
+    memory: {
+        alphaGapHistory: [], // Stores {date, recommended, actual, gap}
+        biasAdjustment: 0 // +Delta or -Delta adjustment based on user history
+    },
+
+    logAlphaGap: function (recommended, actual) {
+        // Calculate diff in delta/risk profile
+        const gap = actual.strike - recommended.strike;
+
+        this.memory.alphaGapHistory.push({
+            timestamp: new Date().toISOString(),
+            rec: recommended.strike,
+            act: actual.strike,
+            gap: gap
+        });
+
+        // Simple Learning: If user consistently chooses safer (lower) strikes
+        if (this.memory.alphaGapHistory.length > 2) {
+            const avgGap = this.memory.alphaGapHistory.reduce((a, b) => a + b.gap, 0) / this.memory.alphaGapHistory.length;
+            if (avgGap < -10) {
+                this.memory.biasAdjustment = -0.05; // Lower delta target
+                console.log("ALPHA LEARNING: User prefers safer strikes. Adjusting future bias.");
+            }
+        }
+        return gap;
+    },
+
+    // Feature: Contextual Recall
+    generateContextMessage: function () {
+        if (this.memory.alphaGapHistory.length > 0) {
+            const last = this.memory.alphaGapHistory[this.memory.alphaGapHistory.length - 1];
+            return `(Recall: Last time you preferred the ${last.act} strike, which was ${Math.abs(last.gap)} pts from my target. I have adjusted this recommendation accordingly.)`;
+        }
+        return "";
     }
 };
 

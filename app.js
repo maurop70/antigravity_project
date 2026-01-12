@@ -155,11 +155,14 @@ function renderStrategy(trade) {
     </div>`;
 
     // Alpha Insight Section (Unchanged mostly)
+    const memoryNote = ALPHA_BRAIN.generateContextMessage(); // Trigger Memory Recall
+
     html += `
         <div class="alpha-insight">
             <div class="alpha-insight-header"><span class="icon">⚡</span> ALPHA INTELLIGENCE</div>
             <div class="alpha-insight-body">
                 "${trade.thesis}"<br>
+                <div style="font-size: 0.7rem; color: #8b9bb4; margin-top: 5px; font-style: italic;">${memoryNote}</div>
                 <button onclick="openStrategyReport()" style="background:none; border:none; color:#00ff9d; text-decoration:underline; cursor:pointer; font-family:'JetBrains Mono'; font-size:0.7rem; margin-top:8px;">>>> OPEN REPORT</button>
             </div>
         </div>
