@@ -48,6 +48,13 @@ const AGENT_DATA = {
             pop: "74%",
             break_even: "6752 / 7146"
         },
+        // To track 'Actual' execution vs 'Recommended'
+        actual_legs: [
+            { side: "Call", action: "Sell", strike: 7000, delta: 0.12 },
+            { side: "Call", action: "Buy", strike: 7025, delta: 0.08 },
+            { side: "Put", action: "Sell", strike: 6800, delta: 0.12 },
+            { side: "Put", action: "Buy", strike: 6750, delta: 0.07 }
+        ],
         thesis: "Bullish Skew (>70% Prob). Widened Put Vertical to 50pts to maximize profit capture.",
         thesis_full_report: `
             <h1>Alpha Trade Strategy: Unbalanced Iron Condor</h1>

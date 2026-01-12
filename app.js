@@ -73,6 +73,24 @@ function startAlphaLoop() {
     }, 5000);
 }
 
+// New Scanner for "Extra Profit"
+function startArbitrageScanner() {
+    console.log("ALPHA: Arbitrage Scanner Active.");
+    setInterval(() => {
+        // Brain Logic
+        const opportunity = ALPHA_BRAIN.scanForArbitrage(AGENT_DATA.active_trade);
+
+        if (opportunity) {
+            triggerDesktopAlert({
+                type: "OPPORTUNITY",
+                headline: "Superior Trade Available",
+                message: `Extra Profit Found: $145. Check Agent Stream.`
+            });
+            appendMessage('agent', opportunity.message);
+        }
+    }, 10000); // Scan every 10 seconds for demo
+}
+
 function renderMetrics(market, trade) {
     document.getElementById('mmm-val').innerText = `+/- ${market.mmm}`;
     document.getElementById('pop-val').innerText = trade.metrics.pop;
@@ -84,77 +102,92 @@ function renderStrategy(trade) {
     const spx = AGENT_DATA.market.spx;
     const mmm = AGENT_DATA.market.mmm;
 
-    // Create Legs HTML with DELTA and DISTANCE
-    const legsHtml = trade.legs.map(leg => {
-        let distInfo = "";
-        if (leg.action === "Sell") {
-            const dist = Math.abs(leg.strike - spx).toFixed(0);
-            distInfo = `<span style="color: ${dist > mmm ? '#00ff9d' : '#ff0055'}; font-size: 0.75rem; margin-right: 8px;">(buffer: ${dist})</span>`;
-        }
+    // Table Header
+    let html = `
+    <div class="strategy-card">
+        <div class="strategy-title">
+            ${trade.type} 
+            <span style="font-size: 0.6em; float: right; color: ${trade.status === 'LIVE' ? '#00ff9d' : '#ffcc00'}">
+                ${trade.status}
+            </span>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 0.5fr; gap: 10px; margin-bottom: 10px; font-size: 0.7rem; color: #64748b; border-bottom: 1px solid #333; padding-bottom: 5px;">
+            <div>LEG</div>
+            <div>RECOMMENDED</div>
+            <div>ACTUAL (EDIT)</div>
+            <div>Δ</div>
+        </div>
+    `;
+
+    // Legs Row
+    const legsHtml = trade.legs.map((leg, index) => {
+        // Use Actual Strike from data, or default to recommended
+        const actualStrike = trade.actual_legs ? trade.actual_legs[index].strike : leg.strike;
+        const isLive = trade.status === 'LIVE';
 
         return `
-        <div class="leg">
-            <label>${leg.action} ${leg.side}</label>
-            <div style="display: flex; align-items: center;">
-                ${distInfo}
-                <span style="color: #64748b; font-size: 0.75rem; font-family: 'JetBrains Mono'; margin-right: 15px;">Δ ${leg.delta}</span>
-                <span style="font-weight: 600; color: #ffcc00;">${leg.strike}</span>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 0.5fr; gap: 10px; align-items: center; margin-bottom: 8px; font-size: 0.8rem;">
+            <div style="color: #b0b0b0;">${leg.action} ${leg.side}</div>
+            <div style="color: #ffcc00;">${leg.strike}</div>
+            <div>
+                <input type="number" 
+                       value="${actualStrike}" 
+                       class="strike-input" 
+                       style="background: #1e293b; border: 1px solid #333; color: #fff; width: 100%; border-radius: 4px; padding: 2px 5px; ${isLive ? 'border-color: #00ff9d;' : ''}"
+                       onchange="updateActualStrike(${index}, this.value)"
+                >
             </div>
+            <div style="color: #64748b; font-family: 'JetBrains Mono';">${leg.delta}</div>
         </div>
     `}).join('');
 
-    // Dynamic Buffer Rationale
-    const shortCall = trade.legs.find(l => l.side === "Call" && l.action === "Sell");
-    const shortPut = trade.legs.find(l => l.side === "Put" && l.action === "Sell");
-    const callDist = (shortCall.strike - spx).toFixed(0);
-    const putDist = (spx - shortPut.strike).toFixed(0);
+    html += legsHtml;
 
-    // Width Calculation
-    const longCall = trade.legs.find(l => l.side === "Call" && l.action === "Buy");
-    const longPut = trade.legs.find(l => l.side === "Put" && l.action === "Buy");
-    const callWidth = Math.abs(shortCall.strike - longCall.strike);
-    const putWidth = Math.abs(shortPut.strike - longPut.strike);
+    // Action Button Logic
+    const btnText = trade.status === 'PENDING ENTRY' ? "CONFIRM ORDER PLACED" : "LIVE MONITORING ACTIVE";
+    const btnColor = trade.status === 'PENDING ENTRY' ? "background: #ff0055;" : "background: #00ff9d; color: #000; cursor: default;";
 
-    const bufferNote = `<strong>Smart Skew Active:</strong><br>
-    • Call Width: ${callWidth} pts (Standard)<br>
-    • <span style="color: #00ff9d">Put Width: ${putWidth} pts (Widened)</span><br><br>
-    <em>Why? Forecast probability > 70% Bullish. We widened the Put vertical to maximize credit capture on the advantaged side.</em>`;
-
-    const html = `
-        <div class="strategy-card">
-            <div class="strategy-title">${trade.type}</div>
-            <div style="font-size: 0.8rem; color: #8b9bb4; margin-bottom: 10px;">
-                Exp: ${trade.expiration} | Status: <span style="color: #ffcc00">${trade.status}</span>
-            </div>
-            
-            <div class="strategy-legs">
-                ${legsHtml}
-            </div>
-
-            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
-                <div class="leg"><label>Est. Credit</label> <span style="color: #00ff9d">${trade.metrics.max_profit}</span></div>
-                <div class="leg"><label>PoP</label> <span>${trade.metrics.pop}</span></div>
-            </div>
+    html += `
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+            <button class="action-btn" style="${btnColor}" onclick="confirmOrder()">${btnText}</button>
         </div>
+    </div>`;
 
+    // Alpha Insight Section (Unchanged mostly)
+    html += `
         <div class="alpha-insight">
-            <div class="alpha-insight-header">
-                <span class="icon">⚡</span> ALPHA INTELLIGENCE
-            </div>
+            <div class="alpha-insight-header"><span class="icon">⚡</span> ALPHA INTELLIGENCE</div>
             <div class="alpha-insight-body">
-                "${trade.thesis}"
-                <br>
-                <button onclick="openStrategyReport()" style="background: none; border: none; color: #00ff9d; text-decoration: underline; cursor: pointer; font-family: 'JetBrains Mono'; font-size: 0.7rem; margin-top: 8px; padding: 0;">>> OPEN TRADE STRATEGY REPORT</button>
-                <br><br>
-                ${bufferNote}
+                "${trade.thesis}"<br>
+                <button onclick="openStrategyReport()" style="background:none; border:none; color:#00ff9d; text-decoration:underline; cursor:pointer; font-family:'JetBrains Mono'; font-size:0.7rem; margin-top:8px;">>>> OPEN REPORT</button>
             </div>
         </div>
-
-        <button class="action-btn" onclick="copyTrade()">COPY ORDER TO CLIPBOARD</button>
     `;
 
     container.innerHTML = html;
 }
+
+// Logic to handle "Actual" updates
+window.updateActualStrike = function (index, value) {
+    AGENT_DATA.active_trade.actual_legs[index].strike = parseInt(value);
+    console.log(`Updated Leg ${index} to ${value}`);
+    // Recalculate Visuals immediately
+    renderVisualizer(AGENT_DATA.market, AGENT_DATA.active_trade);
+}
+
+// Logic to Confirm Order
+window.confirmOrder = function () {
+    if (AGENT_DATA.active_trade.status === 'LIVE') return;
+
+    AGENT_DATA.active_trade.status = 'LIVE';
+    alert("ORDER CONFIRMED. Switching to LIVE MONITORING. Alpha is now scanning for Arbitrage opportunities.");
+    renderStrategy(AGENT_DATA.active_trade);
+
+    // Start the Arbitrage Scanner
+    startArbitrageScanner();
+}
+
 
 function openStrategyReport() {
     const reportWindow = window.open("", "StrategyReport", "width=600,height=800");

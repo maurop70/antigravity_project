@@ -70,6 +70,28 @@ const ALPHA_BRAIN = {
         };
     },
 
+    // 4. Continuous Arbitrage Scanner (New)
+    scanForArbitrage: function (currentTrade) {
+        // Only run if LIVE
+        if (currentTrade.status !== 'LIVE') return null;
+
+        // Logic: Check if a "roll" would generate risk-free profit
+        // Simulation: 5% chance per scan to find a "Better Trade"
+        if (Math.random() < 0.05) {
+            const extraProfit = 145; // Hardcoded simulation value per user story
+            const currentShortPut = currentTrade.actual_legs[2].strike;
+            const betterStrike = currentShortPut - 40; // e.g. 6850 vs 6890
+
+            return {
+                type: "SUPERIOR_TRADE",
+                message: `I've found a more efficient structure. Your current ${currentShortPut} Put has captured 30% of its value, but the Jan 23 cycle just saw an IV spike.<br><br>
+                By rolling now to the ${betterStrike} Put, you maintain the same risk profile but increase your Max Profit by $${extraProfit}.<br><br>
+                <strong>Extra Profit Opportunity: +$${extraProfit}</strong>. Should I prepare the roll order for you?`
+            };
+        }
+        return null;
+    },
+
     // Helper: Calculate EV
     calculateEV: function (trade) {
         // Mock EV calc
