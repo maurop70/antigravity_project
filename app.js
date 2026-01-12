@@ -116,11 +116,26 @@ function renderMetrics(market, trade) {
 }
 
 function renderStrategy(trade) {
-    const container = document.getElementById('active-strategy-container');
+    const container = document.getElementById('optimization-results').parentElement.querySelector("#active-strategy-container") || document.getElementById('active-strategy-container');
     const spx = AGENT_DATA.market.spx;
-    const mmm = AGENT_DATA.market.mmm;
 
-    // Table Header
+    // ACTUAL CONFIG CALCULATION
+    const activeLegs = trade.actual_legs || trade.legs;
+    const putWidth = Math.abs(activeLegs[2].strike - activeLegs[3].strike);
+    const callWidth = Math.abs(activeLegs[0].strike - activeLegs[1].strike);
+
+    // Determine Aggression for ACTUAL column
+    let aggressionLabel = "Standard";
+    let aggressionColor = "#00ff9d";
+
+    if (putWidth > 25) {
+        aggressionLabel = "Aggressive (High Skew)";
+        aggressionColor = "#ff0055";
+    }
+
+    // Editable Expiration Logic
+    const expiration = trade.expiration;
+
     let html = `
     <div class="strategy-card">
         <div class="strategy-title">
@@ -132,7 +147,11 @@ function renderStrategy(trade) {
         </div>
         
         <div style="font-size: 0.75rem; color: #b0b0b0; margin-bottom: 12px; font-family: 'JetBrains Mono'; border-bottom: 1px solid #333; padding-bottom: 8px;">
-            EXPIRATION: <span style="color: #fff; font-weight: bold;">${trade.expiration}</span> (Weekly)
+            EXPIRATION: 
+            <input type="text" value="${expiration}" 
+                   style="background: #1e293b; border: 1px solid #333; color: #fff; padding: 2px 6px; font-family: 'JetBrains Mono'; width: 140px; margin-left: 8px;"
+                   onchange="updateActualExpiration(this.value)"> 
+            <span style="color: #64748b; font-size: 0.7em;">(Edit)</span>
         </div>
 
         <style>
@@ -151,7 +170,6 @@ function renderStrategy(trade) {
 
     // Legs Row
     const legsHtml = trade.legs.map((leg, index) => {
-        // Use Actual Strike from data, or default to recommended
         const actualStrike = trade.actual_legs ? trade.actual_legs[index].strike : leg.strike;
         const isLive = trade.status === 'LIVE';
 
@@ -172,6 +190,16 @@ function renderStrategy(trade) {
     `}).join('');
 
     html += legsHtml;
+
+    // Aggression Meter for ACTUAL
+    html += `
+        <div style="margin-top: 10px; padding: 8px; background: rgba(255,255,255,0.02); border-left: 2px solid ${aggressionColor}; font-size: 0.75rem;">
+            <span style="color: #64748b;">Actual Aggression:</span> 
+            <span style="color: ${aggressionColor}; font-weight: bold; margin-left: 5px;">${aggressionLabel}</span>
+            <br>
+            <span style="font-size: 0.65em; color: #555;">(Based on ${putWidth}w Put / ${callWidth}w Call)</span>
+        </div>
+    `;
 
     // Action Button Logic
     const btnText = trade.status === 'PENDING ENTRY' ? "CONFIRM ORDER PLACED" : "LIVE MONITORING ACTIVE";
@@ -197,7 +225,7 @@ function renderStrategy(trade) {
         </div>
     `;
 
-    container.innerHTML = html;
+    if (container) container.innerHTML = html;
 }
 
 // Logic to handle "Actual" updates
@@ -215,6 +243,15 @@ window.updateActualStrike = function (index, value) {
 
     // Recalculate Visuals immediately
     renderVisualizer(AGENT_DATA.market, AGENT_DATA.active_trade);
+    // Re-render strategy to update aggression labels
+    renderStrategy(AGENT_DATA.active_trade);
+}
+
+window.updateActualExpiration = function (val) {
+    if (!val) return;
+    AGENT_DATA.active_trade.expiration = val;
+    console.log("Updated Expiration:", val);
+    saveState();
 }
 
 function saveState() {
