@@ -115,7 +115,7 @@ function renderStrategy(trade) {
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 0.5fr; gap: 10px; margin-bottom: 10px; font-size: 0.7rem; color: #64748b; border-bottom: 1px solid #333; padding-bottom: 5px;">
             <div>LEG</div>
             <div>RECOMMENDED</div>
-            <div>ACTUAL (EDIT)</div>
+            <div>ACTUAL <span style="font-size: 0.8em;">✏️</span></div>
             <div>Δ</div>
         </div>
     `;
@@ -134,7 +134,7 @@ function renderStrategy(trade) {
                 <input type="number" 
                        value="${actualStrike}" 
                        class="strike-input" 
-                       style="background: #1e293b; border: 1px solid #333; color: #fff; width: 100%; border-radius: 4px; padding: 2px 5px; ${isLive ? 'border-color: #00ff9d;' : ''}"
+                       style="background: #0f172a; border: 1px solid #475569; color: #fff; width: 100%; border-radius: 4px; padding: 4px 6px; font-weight: bold; ${isLive ? 'border-color: #00ff9d;' : 'border-color: #64748b;'}"
                        onchange="updateActualStrike(${index}, this.value)"
                 >
             </div>
