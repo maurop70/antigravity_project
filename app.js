@@ -370,14 +370,25 @@ function renderVisualizer(market, trade) {
     // Simple DOM-based visualizer for the "Safe Zone"
     const container = document.getElementById('map-container');
 
+    // Use Actual Legs if available, else default to Recommended
+    const activeLegs = trade.actual_legs ? trade.actual_legs : trade.legs;
+
     // Calculate percentages for visual bars (simplified)
     const rangeStart = 6700;
     const rangeTotal = 500;
 
     // Safety clamp (0-100) logic implied
     const curPct = Math.max(0, Math.min(100, ((market.spx - rangeStart) / rangeTotal) * 100));
-    const callPct = Math.max(0, Math.min(100, ((trade.legs[0].strike - rangeStart) / rangeTotal) * 100));
-    const putPct = Math.max(0, Math.min(100, ((trade.legs[2].strike - rangeStart) / rangeTotal) * 100));
+    const callPct = Math.max(0, Math.min(100, ((activeLegs[0].strike - rangeStart) / rangeTotal) * 100));
+    const putPct = Math.max(0, Math.min(100, ((activeLegs[2].strike - rangeStart) / rangeTotal) * 100));
+
+    // Calculate Dynamic Deltas (Mock calculation based on distance)
+    // In a real app, this would query an API. Here we estimate.
+    const callDist = Math.abs(activeLegs[0].strike - market.spx);
+    const putDist = Math.abs(activeLegs[2].strike - market.spx);
+    // Rough approx: Delta inversely proportional to distance
+    const callDelta = Math.max(1, Math.round(50 - (callDist / 10))).toString().padStart(2, '0');
+    const putDelta = Math.max(1, Math.round(50 - (putDist / 10))).toString().padStart(2, '0');
 
     container.innerHTML = `
         <div style="position: relative; height: 100%; min-height: 300px; background: rgba(0,0,0,0.2); border-left: 1px solid #333; border-bottom: 1px solid #333; margin: 20px;">
@@ -388,12 +399,12 @@ function renderVisualizer(market, trade) {
 
             <!-- Call Wall -->
             <div style="position: absolute; bottom: ${callPct}%; left: 0; width: 100%; height: ${100 - callPct}%; background: rgba(255, 0, 85, 0.1); border-bottom: 2px solid #ff0055;">
-                <span style="position: absolute; left: 10px; bottom: 5px; color: #ff0055; font-size: 0.7rem; font-weight: bold;">SHORT CALL: ${trade.legs[0].strike} (Δ${trade.legs[0].delta})</span>
+                <span style="position: absolute; left: 10px; bottom: 5px; color: #ff0055; font-size: 0.7rem; font-weight: bold;">SHORT CALL: ${activeLegs[0].strike} (Δ${callDelta})</span>
             </div>
 
             <!-- Put Wall -->
             <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: ${putPct}%; background: rgba(255, 0, 85, 0.1); border-top: 2px solid #ff0055;">
-                <span style="position: absolute; left: 10px; top: 5px; color: #ff0055; font-size: 0.7rem; font-weight: bold;">SHORT PUT: ${trade.legs[2].strike} (Δ${trade.legs[2].delta})</span>
+                <span style="position: absolute; left: 10px; top: 5px; color: #ff0055; font-size: 0.7rem; font-weight: bold;">SHORT PUT: ${activeLegs[2].strike} (Δ${putDelta})</span>
             </div>
             
             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.05); font-size: 3rem; font-weight: 800; pointer-events: none;">SAFE ZONE</div>
