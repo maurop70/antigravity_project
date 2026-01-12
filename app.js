@@ -365,37 +365,46 @@ function calculateOptimization(capital) {
     // Render Best Configuration
     container.innerHTML = `
         <div style="margin-top: 15px; border-top: 1px solid #333; padding-top: 10px;">
-            <div style="background: rgba(0, 255, 157, 0.1); border: 1px solid #00ff9d; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+            <div style="background: rgba(0, 255, 157, 0.05); border: 1px solid #00ff9d; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 0.75rem; color: #00ff9d; font-weight: 700;">ALPHA SOLVER: MAX YIELD</div>
-                    <div style="font-size: 0.7rem; color: #8b9bb4;">BIAS: ${direction.toUpperCase()} (${(AGENT_DATA.forecast.probability * 100).toFixed(0)}%)</div>
+                    <div style="font-size: 0.75rem; color: #00ff9d; font-weight: 700;">ALPHA SOLVER: HIGHEST EV</div>
+                    <div style="font-size: 0.7rem; color: #8b9bb4;">UTILIZATION: ${((bestConfig.exposure / capital) * 100).toFixed(0)}%</div>
                 </div>
                 
                 <div style="font-size: 0.8rem; color: #e0e0e0; margin-top: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
-                     <strong>Conviction:</strong> ${AGENT_DATA.forecast.conviction_summary}
+                     <strong>Structure:</strong> ${bestConfig.desc}
                      <br>
-                     <button onclick="openConvictionReport()" style="background: none; border: none; color: #00ff9d; text-decoration: underline; cursor: pointer; font-family: 'JetBrains Mono'; font-size: 0.7rem; margin-top: 4px; padding: 0;">>> OPEN FULL INTELLIGENCE REPORT</button>
+                     <strong>Aggression:</strong> ${bestConfig.desc.includes("Aggressive") ? "<span style='color:#ff0055'>High (Closer Strikes)</span>" : "<span style='color:#00ff9d'>Standard (Safe Zone)</span>"}
+                     <br>
+                     <strong>Expected Value (EV):</strong> <span style="color:#00ff9d">$${Math.round(bestConfig.score)}</span>
                 </div>
-
-                <div style="font-size: 0.9rem; color: #e0e0e0; margin-top: 8px; line-height: 1.4;">
-                    Optimal Config: <strong>Call ${bestConfig.cW}w / Put ${bestConfig.pW}w</strong>
+                
+                <div style="font-size: 0.65rem; color: #64748b; margin-top: 4px; font-family: 'JetBrains Mono';">
+                    MATH: (Win% x Profit) - (Loss% x Risk)
                 </div>
             </div>
 
-            <div class="leg">
-                <label>Rec. Contracts</label>
-                <span style="font-size: 1.2rem; color: #fff; font-weight: 700;">${bestConfig.contracts}</span>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="leg">
+                    <label>Contracts</label>
+                    <span style="font-size: 1.2rem; color: #fff; font-weight: 700;">${bestConfig.contracts}</span>
+                </div>
+                <div class="leg">
+                    <label>Win Rate</label>
+                    <span style="color: #00ff9d;">${(bestConfig.winRate * 100).toFixed(0)}%</span>
+                </div>
+                <div class="leg">
+                    <label>Total Risk</label>
+                    <span>$${bestConfig.exposure.toLocaleString()}</span>
+                </div>
+                <div class="leg">
+                    <label>Max Profit</label>
+                    <span style="color: #ffcc00; font-weight: 700;">$${bestConfig.profit.toLocaleString()}</span>
+                </div>
             </div>
-            <div class="leg">
-                <label>Total Exposure</label>
-                <span>$${bestConfig.exposure.toLocaleString()}</span>
-            </div>
-            <div class="leg">
-                <label>Max Profit</label>
-                <span style="color: #ffcc00; font-weight: 700;">$${bestConfig.profit.toLocaleString()}</span>
-            </div>
-            <div style="font-size: 0.75rem; color: #64748b; margin-top: 8px; font-style: italic;">
-                *Solver maximized profit by utilizing 100% of capital on the asymmetric ${bestConfig.cW}/${bestConfig.pW} structure.
+            
+            <div style="font-size: 0.7rem; color: #64748b; margin-top: 8px; font-style: italic;">
+                *Solver maximized EV by utilizing 100% of capital on the asymmetric ${bestConfig.cW}/${bestConfig.pW} structure.
             </div>
         </div>
     `;
