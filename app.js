@@ -131,6 +131,10 @@ function renderStrategy(trade) {
             </span>
         </div>
         
+        <div style="font-size: 0.75rem; color: #b0b0b0; margin-bottom: 12px; font-family: 'JetBrains Mono'; border-bottom: 1px solid #333; padding-bottom: 8px;">
+            EXPIRATION: <span style="color: #fff; font-weight: bold;">${trade.expiration}</span> (Weekly)
+        </div>
+
         <style>
              @keyframes blink { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
              .blink { animation: blink 1.5s infinite; color: #00ff9d; margin-left: 8px; font-weight: normal; }
