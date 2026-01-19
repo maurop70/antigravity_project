@@ -1,37 +1,50 @@
-# Iron Condor Alpha 🦅
+# Alpha Advisor Suite 🦅
 
-**Version**: 1.0.0 "Aphelion Photon"
-**Status**: Live / Continuous Intelligence Active
+**Version:** 1.0.0 PRODUCTION
+**Status:** ACTIVE | Live Intelligence & Monitoring
 
 ## Overview
-A specialized trading agent dashboard designed for managing SPX Iron Condors. It features "Smart Skew" logic, dynamic capital allocation, and a continuous Alpha Intelligence engine that monitors simulated global feeds for risks and opportunities.
+Alpha Advisor is a comprehensive SPX Iron Condor intelligence suite. It combines a powerful Python backend (for Black-Scholes math and data fetching) with multiple user interfaces to suit your trading style.
 
-## Key Features
-*   **Smart Skew**: Automatically adjusts vertical spreads (Call vs Put width) based on directional forecast probability (>70%).
-*   **Capital Allocator**: "Alpha Solver" calculates the optimal contract size and width configuration for maximum yield based on available capital.
-*   **Safe Zone Visualizer**: Interactive, resizable map showing the distance between current price and short strikes relative to the Market Maker Move (MMM).
-*   **Alpha Intelligence Engine**:
-    *   **Continuous Feed**: Simulates Macro, Geopolitical, and Corporate news.
-    *   **Opportunity Scanner**: Detects "Better Trade" EV swaps.
-    *   **Desktop Alerts**: Browser notifications and popups for critical signals (War, Fed, Crash).
+## 🚀 Three Ways to Run
 
-## Usage
-1.  **Local**: Open `index.html` in any modern browser.
-2.  **Simulation**: Use the Chat Interface to inject scenarios:
-    *   `simulate war` (Critical Risk)
-    *   `simulate fed` (Macro Opportunity)
-    *   `simulate crash` (Black Swan)
+### 1. Alpha Advisor (The Report)
+**"I just want the numbers."**
+*   **Launch:** Desktop Shortcut `Alpha Advisor`
+*   **What it does:** Runs a quick diagnostic, fetches live SPX/VIX data, and prints a strategy report recommending optimal strikes.
+*   **Tech:** `python alpha_core.py` (Local)
 
-## Deployment (Remote Access)
-To access this dashboard from another PC:
-1.  Push this repository to GitHub.
-2.  Enable **GitHub Pages** in Repository Settings -> Pages -> Source: `main` / root.
-3.  Access via `https://your-username.github.io/your-repo-name`.
+### 2. Alpha Watchdog (The Guardian)
+**"Watch my back while I work."**
+*   **Launch:** Desktop Shortcut `Alpha Watchdog`
+*   **What it does:** Runs silently in the background. Checks the market every 5 minutes.
+*   **Alerts:** Plays a sound and pops up a warning box if Critical Risk is detected.
+*   **Tech:** `python alpha_watchdog.py` (Visual/Audio Alerts)
 
-## Tech Stack
-*   **Frontend**: Vanilla HTML5, CSS3 (Grid/Flexbox), JavaScript (ES6+).
-*   **Data**: Local Simulation Modules (`data.js`, `alpha_feed.js`, `alpha_brain.js`).
-*   **Theme**: Financial Terminal Dark Mode.
+### 3. Command Center (The Dashboard)
+**"I want to see the battlefield."**
+*   **Launch:** Desktop Shortcut `Antigravity Launch` (or `Alpha Dashboard`)
+*   **What it does:** Launches the **Data Bridge** and the **Web UI**.
+*   **Features:**
+    *   Live Price Tickers
+    *   Safe Zone Visualization Map
+    *   Interactive Chat with Antigravity
+*   **Tech:** `Launch Suite` -> Python Bridge + HTML5 Dashboard.
 
 ---
-*Built by Antigravity Agent for High-Conviction Trading.*
+
+## Technical Architecture
+*   **Core Brain:** `alpha_core.py` - The central logic engine.
+*   **Bridge:** `alpha_bridge.py` - Flask server connecting Python to the Browser.
+*   **Frontend:** `index.html` - Vanilla JS Dashboard.
+*   **Automation:** `alpha_watchdog.py` - Independent monitoring loop.
+
+## Installation
+Dependencies required:
+```bash
+pip install yfinance flask flask-cors
+```
+(The launch scripts will attempt to install these automatically).
+
+---
+*Built by Antigravity Agent.*

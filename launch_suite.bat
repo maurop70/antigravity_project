@@ -1,12 +1,12 @@
 @echo off
-title ALPHA INTELLIGENCE - STARTUP
+title ANTIGRAVITY SUITE - LAUNCHER
 
 echo ==================================================
-echo      INITIALIZING ALPHA TRADING SYSTEM
+echo      INITIALIZING ANTIGRAVITY & ALPHA ADVISOR
 echo ==================================================
 echo.
 
-echo [1/3] Checking for Python Bridge...
+echo [1/4] Checking for Python Bridge...
 python --version >nul 2>&1
 if %errorlevel% EQU 0 goto FOUND
 goto NOTFOUND
@@ -25,13 +25,17 @@ echo       (Manual Mode will still work)
 
 :LAUNCH
 echo.
-echo [2/3] Launching Dashboard...
+echo [2/4] Launching Alpha Dashboard...
 start index.html
 
+echo [3/4] Launching Antigravity Chat (Direct Uplink)...
+start local_chat.html
+
 echo.
-echo [3/3] System Online.
+echo [4/4] System Online.
 echo ==================================================
 echo       Leave the 'ALPHA BRIDGE' window open 
 echo       to receive live data updates.
 echo ==================================================
-pause
+timeout /t 5 >nul
+exit

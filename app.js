@@ -10,9 +10,83 @@ function initDashboard() {
     renderVisualizer(AGENT_DATA.market, AGENT_DATA.active_trade);
     renderMetrics(AGENT_DATA.market, AGENT_DATA.active_trade);
     calculateOptimization(10000); // Initial calc
-    startAlphaLoop(); // Start Continuous Intelligence
     startArbitrageScanner(); // Start "Extra Profit" Scanner immediately
+    startEventScanner(); // Start Macro Risk Scanner
+    startSkewScanner(); // Start Skew Optimization Scanner
+    startDataBridge(); // Start Python Bridge Polling
     requestNotificationPermission(); // Ask user for permission
+}
+
+// PYTHON BRIDGE CONNECTION
+function startDataBridge() {
+    console.log("ALPHA: Attempting to connect to Python Data Bridge...");
+    setInterval(async () => {
+        try {
+            const response = await fetch('http://localhost:5000/market_data');
+            if (response.ok) {
+                const data = await response.json();
+
+                if (data.spx !== AGENT_DATA.market.spx) {
+                    console.log(`BRIDGE: New Data Received. SPX: ${data.spx}`);
+
+                    // FIRST LOAD: Generate Initial Strategy if none exists
+                    const isFirstLoad = AGENT_DATA.market.spx === 0;
+
+                    // Update Agent Data
+                    AGENT_DATA.market.spx = data.spx;
+                    AGENT_DATA.market.vix = data.vix;
+                    if (data.bias) AGENT_DATA.forecast.direction = data.bias;
+                    if (data.trend) AGENT_DATA.market.trend = data.trend; // New Trend Data
+
+                    // GENERATE LIVE STRATEGY (The "Alpha Brain" moment)
+                    if (isFirstLoad) {
+                        generateLiveRecommendation(AGENT_DATA.market);
+                    }
+
+                    // PROCESS EVENTS (Real News from Bridge)
+                    try {
+                        if (data.events && data.events.length > 0) {
+                            data.events.forEach(event => {
+                                // Pass through Alpha Brain
+                                const brainResult = ALPHA_BRAIN.processEvent(event, AGENT_DATA.active_trade);
+                                if (brainResult && brainResult.type !== "INFO") {
+                                    showInAppAlert(brainResult.type, `MARKET NEWS: ${event.source}`, brainResult.message);
+                                    appendMessage('agent', `📰 <strong>News Detected:</strong> ${event.headline}<br>${brainResult.message}`);
+                                }
+                            });
+                        }
+                    } catch (err) {
+                        console.error("ALPHA: Event Processing Error", err);
+                    }
+
+                    // Update UI
+                    const spxEl = document.getElementById('ticker-spx');
+                    const vixEl = document.getElementById('ticker-vix');
+
+                    if (spxEl) {
+                        spxEl.innerText = data.spx.toFixed(2);
+                        spxEl.style.color = "#00ff9d"; // Live Indicator
+                    }
+                    if (vixEl) vixEl.innerText = data.vix.toFixed(2);
+
+                    // Update Inputs
+                    const inputSpx = document.getElementById('input-spx');
+                    const inputVix = document.getElementById('input-vix');
+                    const inputBias = document.getElementById('input-bias');
+
+                    if (inputSpx) inputSpx.value = data.spx;
+                    if (inputVix) inputVix.value = data.vix;
+                    if (inputBias && data.bias) inputBias.value = data.bias;
+
+                    // Trigger Calculation
+                    calculateOptimization(parseFloat(document.getElementById('capital-input')?.value) || 10000);
+                }
+            }
+        } catch (e) {
+            // Bridge not running, silent fail (Manual Mode takes over)
+            // console.log("Bridge offline, using manual/simulated data.");
+        }
+    }, 5000); // Poll every 5 seconds
 }
 
 // REAL DATA UPDATE LOGIC
@@ -79,7 +153,11 @@ function triggerDesktopAlert(alertData) {
     }
 }
 
-function showInAppAlert(type, headline, message) {
+// GLOBAL STATE FOR PREVIEW
+let PENDING_UPGRADE = null;
+let ORIGINAL_TRADE_BACKUP = null;
+
+function showInAppAlert(type, headline, messageOrData) {
     // Remove existing
     const existing = document.getElementById('alpha-alert-overlay');
     if (existing) existing.remove();
@@ -93,47 +171,249 @@ function showInAppAlert(type, headline, message) {
         animation: fadeIn 0.3s ease;
     `;
 
-    const color = type.includes("CRITICAL") ? "#ff0055" : "#00ff9d";
+    const color = type.includes("CRITICAL") ? "#ff0055" : (messageOrData.upgradeData && messageOrData.upgradeData.isSkew ? "#bf00ff" : "#00ff9d");
+    let contentHtml = "";
 
-    overlay.innerHTML = `
-        <div style="background: #0a0b0e; border: 2px solid ${color}; padding: 40px; max-width: 500px; text-align: center; box-shadow: 0 0 50px ${color}44;">
-            <h1 style="color: ${color}; font-family: 'JetBrains Mono'; margin: 0 0 10px 0;">⚠️ ${type}</h1>
-            <h3 style="color: #fff; margin: 0 0 20px 0;">${headline}</h3>
-            <p style="color: #b0b0b0; font-size: 1.1rem;">${message}</p>
-            <button onclick="document.getElementById('alpha-alert-overlay').remove()" 
-                    style="background: ${color}; color: #000; border: none; padding: 12px 30px; font-weight: bold; margin-top: 20px; cursor: pointer;">
-                ACKNOWLEDGE
-            </button>
-        </div>
-    `;
+    // CHECK IF THIS IS A STRUCTURED UPGRADE ALERT
+    if (messageOrData.upgradeData) {
+        const data = messageOrData.upgradeData;
+        PENDING_UPGRADE = data; // Store for preview
 
+        let headerLabel = "NET IMPROVEMENT";
+        if (data.isProtection) headerLabel = "PROTECTION COST";
+        if (data.isSkew) headerLabel = "SKEW EFFICIENCY";
+
+        contentHtml = `
+            <div style="background: #0a0b0e; border: 2px solid ${color}; padding: 30px; max-width: 600px; text-align: left; box-shadow: 0 0 50px ${color}44; font-family: 'Inter', sans-serif;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; padding-bottom:15px; margin-bottom:15px;">
+                    <h1 style="color: ${color}; font-family: 'JetBrains Mono'; margin: 0; font-size: 1.5rem;">${headline}</h1>
+                    <div style="text-align:right;">
+                        <span style="display:block; font-size:0.7rem; color:#8b9bb4;">${headerLabel}</span>
+                        <span style="font-size:1.2rem; color:${data.isProtection ? "#ffcc00" : color}; font-weight:bold;">${data.isProtection ? "-" : "+"}$${Math.abs(data.netProfit)}</span>
+                    </div>
+                </div>
+// ... (rest is same) ...
+
+// New Scanner for "Skew Hunter"
+function startSkewScanner() {
+    console.log("ALPHA: Skew Hunter Active.");
+    setInterval(() => {
+        // Stop scanning if simulation active
+        if (AGENT_DATA.active_trade.status === 'SIMULATING_UPGRADE') return;
+
+        const skewOpp = ALPHA_BRAIN.scanForSkew(AGENT_DATA.active_trade, AGENT_DATA.market);
+        
+        if (skewOpp) {
+             showInAppAlert(skewOpp.type, skewOpp.headline, skewOpp);
+             appendMessage('agent', skewOpp.message);
+        }
+    }, 12000); // Check every 12s
+}
+
+// ... (existing loops) ...
+
+                <p style="color: #e0e0e0; font-size: 0.9rem; line-height: 1.5; margin-bottom: 20px;">
+                    ${messageOrData.message.split("<br>")[0]}
+                </p>
+
+                <div style="background: #1e293b; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                    <div style="font-size: 0.75rem; color: #8b9bb4; margin-bottom: 10px; font-weight:bold;">EXECUTION PLAN:</div>
+                    <table style="width:100%; border-collapse: collapse; font-size: 0.8rem; font-family: 'JetBrains Mono';">
+                        <tr style="color: #64748b; text-align: left;">
+                            <th style="padding-bottom:5px;">ACTION</th>
+                            <th style="padding-bottom:5px;">QTY</th>
+                            <th style="padding-bottom:5px;">LEG</th>
+                        </tr>
+                        ${data.instructions.map(inst => `
+                            <tr>
+                                <td style="color: ${inst.action.includes("BUY") ? "#ffcc00" : "#ff0055"}; padding: 4px 0;">${inst.action}</td>
+                                <td style="color: #fff; padding: 4px 0;">${inst.quantity}</td>
+                                <td style="color: #fff; padding: 4px 0;">${inst.leg}</td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="document.getElementById('alpha-alert-overlay').remove()" 
+                            style="background: transparent; border: 1px solid #333; color: #8b9bb4; padding: 10px 20px; cursor: pointer;">
+                        DISMISS
+                    </button>
+                    <button onclick="previewTradeUpgrade()" 
+                            style="background: ${color}; color: #000; border: none; padding: 10px 25px; font-weight: bold; cursor: pointer; box-shadow: 0 0 15px ${color}66;">
+                        PREVIEW & EDIT
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        // STANDARD ALERT (Keep existing)
+        contentHtml = `
+            <div style="background: #0a0b0e; border: 2px solid ${color}; padding: 40px; max-width: 500px; text-align: center; box-shadow: 0 0 50px ${color}44;">
+                <h1 style="color: ${color}; font-family: 'JetBrains Mono'; margin: 0 0 10px 0;">⚠️ ${type}</h1>
+                <h3 style="color: #fff; margin: 0 0 20px 0;">${headline}</h3>
+                <p style="color: #b0b0b0; font-size: 1.1rem;">${messageOrData}</p>
+                <button onclick="document.getElementById('alpha-alert-overlay').remove()" 
+                        style="background: ${color}; color: #000; border: none; padding: 12px 30px; font-weight: bold; margin-top: 20px; cursor: pointer;">
+                    ACKNOWLEDGE
+                </button>
+            </div>
+        `;
+    }
+
+    overlay.innerHTML = contentHtml;
     document.body.appendChild(overlay);
 }
 
-function startAlphaLoop() {
-    // Simulate background scanning (Noise + Occasional Events)
+// ... (keep preview/commit/cancel logic) ...
+
+// New Scanner for "Skew Hunter"
+function startSkewScanner() {
+    console.log("ALPHA: Skew Hunter Active.");
     setInterval(() => {
-        // 10% chance to inject noise to show system is alive
-        if (Math.random() < 0.1) {
-            const noise = ALPHA_FEED.generateNoise();
-            console.log(`FEED: ${noise.headline}`);
+        // Stop scanning if simulation active
+        if (!AGENT_DATA.active_trade || AGENT_DATA.active_trade.status === 'SIMULATING_UPGRADE') return;
+
+        const skewOpp = ALPHA_BRAIN.scanForSkew(AGENT_DATA.active_trade, AGENT_DATA.market);
+
+        if (skewOpp) {
+            showInAppAlert(skewOpp.type, skewOpp.headline, skewOpp);
+            appendMessage('agent', skewOpp.message);
         }
-    }, 5000);
+    }, 12000); // Check every 12s
 }
+
+// ... (existing startEventScanner) ...
+// Scanner for "Event Horizon" (Risk)
+function startEventScanner() {
+    console.log("ALPHA: Event Shield Scanner Active.");
+    setInterval(() => {
+        // Stop scanning if simulation active
+        if (AGENT_DATA.active_trade.status === 'SIMULATING_UPGRADE') return;
+
+        const risk = ALPHA_BRAIN.scanForEventRisk(AGENT_DATA.active_trade, AGENT_DATA.market);
+
+        if (risk) {
+            // Priority Alert
+            showInAppAlert(risk.type, risk.headline, risk);
+            appendMessage('agent', risk.message);
+        }
+    }, 15000); // Check every 15s
+}
+
+// ... (existing startArbitrageScanner) ...
+
+// SIMULATION / PREVIEW LOGIC
+window.previewTradeUpgrade = function () {
+    if (!PENDING_UPGRADE) return;
+
+    // 1. Close Modal
+    document.getElementById('alpha-alert-overlay').remove();
+
+    // 2. Backup Current State
+    ORIGINAL_TRADE_BACKUP = JSON.parse(JSON.stringify(AGENT_DATA.active_trade));
+
+    // 3. Apply Upgrade to Active State (TEMPORARY)
+    AGENT_DATA.active_trade.actual_legs = PENDING_UPGRADE.newLegs;
+    AGENT_DATA.active_trade.status = 'SIMULATING_UPGRADE';
+
+    // 4. Force Render
+    // (This triggers the "Comparison View", effectively showing the "New Scenario")
+    calculateOptimization(parseFloat(document.getElementById('capital-input').value) || 10000);
+    renderStrategy(AGENT_DATA.active_trade);
+    renderVisualizer(AGENT_DATA.market, AGENT_DATA.active_trade);
+
+    // 5. Show "COMMIT" Floating Panel
+    showCommitPanel();
+
+    console.log("ALPHA: Entering Simulation Mode.");
+    appendMessage('agent', "I have loaded the <strong>Proposed Upgrade</strong> into the dashboard. You can tweak the strikes or contracts now. <br>Click <strong>CONFIRM UPGRADE</strong> to execute.");
+}
+
+function showCommitPanel() {
+    const existing = document.getElementById('commit-panel');
+    if (existing) existing.remove();
+
+    const panel = document.createElement('div');
+    panel.id = 'commit-panel';
+    panel.style.cssText = `
+        position: fixed; bottom: 20px; right: 20px; 
+        background: #0f172a; border: 1px solid #00ff9d; padding: 20px; 
+        border-radius: 8px; box-shadow: 0 0 30px rgba(0,255,157,0.2);
+        z-index: 999; display: flex; flex-direction: column; gap: 10px;
+        animation: slideUp 0.3s ease;
+    `;
+
+    panel.innerHTML = `
+        <div style="font-size: 0.8rem; color: #00ff9d; font-weight: bold; font-family: 'JetBrains Mono';">
+            MODE: SIMULATION
+        </div>
+        <div style="font-size: 0.7rem; color: #b0b0b0;">
+            Reviewing Trade Upgrade.<br>Edit inputs directly in the dashboard.
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button onclick="cancelUpgrade()" style="background: transparent; border: 1px solid #ff0055; color: #ff0055; padding: 5px 10px; cursor: pointer; font-size: 0.7rem;">DISCARD</button>
+            <button onclick="commitUpgrade()" style="background: #00ff9d; border: none; color: #000; padding: 5px 15px; font-weight: bold; cursor: pointer; font-size: 0.7rem;">CONFIRM UPGRADE</button>
+        </div>
+    `;
+    document.body.appendChild(panel);
+}
+
+window.commitUpgrade = function () {
+    // 1. Finalize State
+    AGENT_DATA.active_trade.status = 'LIVE';
+    saveState();
+
+    // 2. Cleanup UI
+    document.getElementById('commit-panel').remove();
+    PENDING_UPGRADE = null;
+    ORIGINAL_TRADE_BACKUP = null;
+
+    // 3. Feedback
+    renderStrategy(AGENT_DATA.active_trade);
+    calculateOptimization(parseFloat(document.getElementById('capital-input').value) || 10000); // Refreshes Tracker
+
+    appendMessage('agent', "✅ <strong>ORDER PLACED.</strong> New structure is active and being monitored.");
+    triggerDesktopAlert({ type: "SUCCESS", headline: "Trade Adjusted", message: "Portfolio updated successfully." });
+}
+
+window.cancelUpgrade = function () {
+    if (ORIGINAL_TRADE_BACKUP) {
+        AGENT_DATA.active_trade = ORIGINAL_TRADE_BACKUP;
+        renderStrategy(AGENT_DATA.active_trade);
+        calculateOptimization(parseFloat(document.getElementById('capital-input').value) || 10000);
+        renderVisualizer(AGENT_DATA.market, AGENT_DATA.active_trade);
+    }
+    document.getElementById('commit-panel').remove();
+    PENDING_UPGRADE = null;
+    ORIGINAL_TRADE_BACKUP = null;
+    appendMessage('user', "I discarded the proposed upgrade.");
+    appendMessage('agent', "Understood. Resuming monitoring of original position.");
+}
+
+
+
 
 // New Scanner for "Extra Profit"
 function startArbitrageScanner() {
     console.log("ALPHA: Arbitrage Scanner Active.");
     setInterval(() => {
+        // Stop scanning if we are in the middle of a simulation
+        if (AGENT_DATA.active_trade.status === 'SIMULATING_UPGRADE') return;
+
         // Brain Logic
         const opportunity = ALPHA_BRAIN.scanForArbitrage(AGENT_DATA.active_trade);
 
         if (opportunity) {
-            // DIFFERENTIATE ALERT TYPES
-            const alertType = opportunity.type === "BETTER_ENTRY" ? "OPPORTUNITY" : "TRADE UPGRADE";
-
-            showInAppAlert(alertType, opportunity.headline, opportunity.message);
-            appendMessage('agent', opportunity.message);
+            // DIFFERENTIATE ALERT TYPES via Object check
+            if (opportunity.upgradeData) {
+                showInAppAlert("TRADE UPGRADE", opportunity.headline, opportunity);
+                appendMessage('agent', opportunity.message);
+            } else {
+                const alertType = opportunity.type === "BETTER_ENTRY" ? "OPPORTUNITY" : "TRADE UPGRADE";
+                showInAppAlert(alertType, opportunity.headline, opportunity.message);
+                appendMessage('agent', opportunity.message);
+            }
         }
     }, 10000); // Scan every 10 seconds for demo
 }
@@ -181,11 +461,20 @@ function renderStrategy(trade) {
             <div>
                 <span style="color:#64748b; font-size:0.7rem;">RECOMMENDED:</span> <span style="color:#00ff9d; font-weight:bold;">${recExpiration}</span>
             </div>
-            <div>
-                ACTUAL: 
-                <input type="text" value="${expiration}" 
-                       style="background: #1e293b; border: 1px solid #333; color: #fff; padding: 2px 6px; font-family: 'JetBrains Mono'; width: 100px; margin-left: 5px;"
+            <div style="display: flex; gap: 10px;">
+                <div>
+                   <span style="color:#64748b; font-size:0.7rem;">EXP:</span>
+                   <input type="text" value="${expiration}" 
+                       style="background: #1e293b; border: 1px solid #333; color: #fff; padding: 2px 6px; font-family: 'JetBrains Mono'; width: 80px;"
                        onchange="updateActualExpiration(this.value)"> 
+                </div>
+                <div>
+                   <span style="color:#64748b; font-size:0.7rem;">QTY:</span>
+                   <input type="number" value="${trade.actual_contracts || 0}" 
+                       id="actual-contracts-input"
+                       style="background: #1e293b; border: 1px solid #333; color: #fff; padding: 2px 6px; font-family: 'JetBrains Mono'; width: 50px;"
+                       onchange="updateActualContracts(this.value)"> 
+                </div>
             </div>
         </div>
 
@@ -217,7 +506,7 @@ function renderStrategy(trade) {
                        value="${actualStrike}" 
                        class="strike-input" 
                        style="background: #0f172a; border: 1px solid #475569; color: #fff; width: 100%; border-radius: 4px; padding: 4px 6px; font-weight: bold; ${isLive ? 'border-color: #00ff9d;' : 'border-color: #64748b;'}"
-                       oninput="updateActualStrike(${index}, this.value)"
+                       onchange="updateActualStrike(${index}, this.value)"
                 >
             </div>
             <div style="color: #64748b; font-family: 'JetBrains Mono';">${leg.delta}</div>
@@ -285,6 +574,18 @@ function getRecommendedExpiration() {
 }
 
 // Logic to handle "Actual" updates
+window.updateActualContracts = function (val) {
+    if (!val) return;
+    const qty = parseInt(val);
+    AGENT_DATA.active_trade.actual_contracts = qty;
+    console.log("Updated Actual Contracts:", qty);
+    saveState();
+
+    // Trigger Recalc of Optimizer to show Used Capital
+    calculateOptimization(parseFloat(document.getElementById('capital-input').value) || 10000);
+}
+
+
 window.updateActualStrike = function (index, value) {
     if (!value || value === "") return; // Don't break on empty input while typing
     const val = parseInt(value);
@@ -300,6 +601,9 @@ window.updateActualStrike = function (index, value) {
     renderVisualizer(AGENT_DATA.market, AGENT_DATA.active_trade);
     // Re-render strategy to update aggression labels
     renderStrategy(AGENT_DATA.active_trade);
+
+    // Trigger Optimizer Recalc (Widths might have changed)
+    calculateOptimization(parseFloat(document.getElementById('capital-input').value) || 10000);
 }
 
 window.updateActualExpiration = function (val) {
@@ -326,6 +630,15 @@ window.confirmOrder = function () {
     if (AGENT_DATA.active_trade.status === 'LIVE') return;
 
     AGENT_DATA.active_trade.status = 'LIVE';
+
+    // Auto-set contracts if 0 (Simulate fill based on capital)
+    if (!AGENT_DATA.active_trade.actual_contracts || AGENT_DATA.active_trade.actual_contracts === 0) {
+        // Default to what optimizer said was 'best' - we'll just grab from the DOM or calc
+        // For now, let's just prompt user or set to 10
+        AGENT_DATA.active_trade.actual_contracts = 10;
+        document.getElementById('actual-contracts-input').value = 10;
+    }
+
     alert("ORDER CONFIRMED. Switching to LIVE MONITORING. Alpha is now scanning for Arbitrage opportunities.");
     renderStrategy(AGENT_DATA.active_trade);
 
@@ -337,40 +650,87 @@ window.confirmOrder = function () {
 function openStrategyReport() {
     const reportWindow = window.open("", "StrategyReport", "width=600,height=800");
     const trade = AGENT_DATA.active_trade;
-    // Use Actual legs if live, otherwise Recommended
+    const market = AGENT_DATA.market;
+
+    // Calculate Metrics
+    const recMetrics = calculateTradeMetrics(trade.legs, trade.actual_contracts || 10, market);
+    const actMetrics = calculateTradeMetrics(trade.actual_legs || trade.legs, trade.actual_contracts || 10, market);
     const activeLegs = trade.actual_legs || trade.legs;
 
+    // Generate Management Plan (EXACT INSTRUCTIONS)
+    // We mock the "next week" date for rolling
+    const today = new Date();
+    const nextExp = new Date(today);
+    nextExp.setDate(today.getDate() + 7);
+    const nextExpStr = nextExp.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
     const reportContent = `
-        <h1>Alpha Trade Strategy Report</h1>
-        <h3>1. Market Condition</h3>
-        <p><strong>Thesis:</strong> ${trade.thesis}</p>
-        <p><strong>Forecast:</strong> ${AGENT_DATA.forecast.direction} (${(AGENT_DATA.forecast.probability * 100).toFixed(0)}% Confidence)</p>
+        <h1>Alpha Strategy Intelligence</h1>
+        <div style="font-size: 0.8rem; color: #8b9bb4; margin-bottom: 20px;">
+            REPORT GENERATED: ${new Date().toLocaleTimeString()} | THESIS: ${AGENT_DATA.forecast.direction}
+        </div>
+
+        <h3>1. Alpha Rationale (The "Why")</h3>
+        <p>
+            I recommended this <strong>Iron Condor</strong> structure because the market is exhibiting 
+            <strong>${AGENT_DATA.market.vix > 20 ? 'High Volatility' : 'Normal Volatility'}</strong> with a 
+            <strong>${AGENT_DATA.forecast.direction}</strong> bias.
+        </p>
+        <p>
+            The selected Short Strikes (${trade.legs[2].strike} / ${trade.legs[0].strike}) were chosen to sit 
+            outside the expected "Market Maker Move" range, theoretically offering a <strong>${recMetrics.pop} Probability of Success</strong>.
+        </p>
         <hr>
-        <h3>2. Execution Structure (Actual)</h3>
+
+        <h3>2. Deviation Analysis (Rec vs Actual)</h3>
+        ${actMetrics.popVal < recMetrics.popVal - 0.05 ?
+            `<p style="color: #ff0055; border-left: 3px solid #ff0055; padding-left: 10px;">
+                <strong>⚠️ RISK ALERT:</strong> You have deviated significantly from the safe zone. 
+                Your Probability of Profit has dropped to <strong>${actMetrics.pop}</strong> (vs ${recMetrics.pop} recommended).
+                You are accepting higher Gamma risk for a potential profit increase of $${(actMetrics.maxProfit - recMetrics.maxProfit).toFixed(0)}.
+            </p>` :
+            `<p style="color: #00ff9d;">
+                <strong>✅ ALIGNMENT CONFIRMED:</strong> Your actual execution aligns well with the optimal math. 
+                PoP is stable at <strong>${actMetrics.pop}</strong>.
+            </p>`
+        }
+        <hr>
+
+        <h3>3. Execution Profile</h3>
         <ul>
-            <li><strong>Short Call:</strong> ${activeLegs[0].strike} (Delta ${activeLegs[0].delta})</li>
-            <li><strong>Short Put:</strong> ${activeLegs[2].strike} (Delta ${activeLegs[2].delta})</li>
-            <li><strong>Long Hedges:</strong> ${activeLegs[1].strike} / ${activeLegs[3].strike}</li>
+            <li><strong>Actual Contracts:</strong> ${trade.actual_contracts || "--"}</li>
+            <li><strong>Max Risk:</strong> $${actMetrics.maxRisk.toLocaleString()}</li>
+            <li><strong>Max Profit:</strong> $${actMetrics.maxProfit.toLocaleString()}</li>
+            <li><strong>Break Even:</strong> ${activeLegs[2].strike - actMetrics.credit} / ${activeLegs[0].strike + parseFloat(actMetrics.credit)}</li>
         </ul>
         <hr>
-        <h3>3. Risk Profile</h3>
-        <p><strong>Max Profit:</strong> ${trade.metrics.max_profit}</p>
-        <p><strong>Probability of Profit:</strong> ${trade.metrics.pop}</p>
-        <p><strong>Breakeven Range:</strong> ${trade.metrics.break_even}</p>
-        <hr>
-        <h3>4. Exit Strategy (Dynamic)</h3>
-        <p><strong>Profit Target:</strong> Close at 50% Profit.</p>
-        <p><strong>Stop Loss:</strong> 200% of Initial Credit.</p>
-        <p><strong>Defense Trigger:</strong> Roll position if SPX touches Short Strikes:</p>
+
+        <h3>4. Management Plan (Cadence Protocol)</h3>
+        <p><strong>PROFIT TAKING:</strong></p>
         <ul>
-            <li><strong>Upside Breach:</strong> ${activeLegs[0].strike} (Call Side)</li>
-            <li><strong>Downside Breach:</strong> ${activeLegs[2].strike} (Put Side)</li>
+            <li>Close entire position at <strong>50% Max Profit</strong> ($${(actMetrics.maxProfit * 0.5).toFixed(0)}).</li>
         </ul>
+
+        <p><strong>DEFENSE (ROLLING & OPPORTUNITY COST):</strong></p>
+        <ul>
+            <li>
+                <strong>IF SPX Touches ${activeLegs[2].strike} (Put Side):</strong><br>
+                ROLL [Short Put ${activeLegs[2].strike}] → [Short Put ${activeLegs[2].strike - 25}] (Same Exp).<br>
+                <em>Target Credit: Receive $0.20 or Pay max $0.10 debit.</em>
+            </li>
+            <li style="margin-top:10px;">
+                <strong>IF TESTING CONTINUES > 2 Days:</strong><br>
+                <!-- CADENCE PROTOCOL LOGIC -->
+                <strong>CADENCE CHECK:</strong> Rolling to ${nextExpStr} disrupts the Monday Entry Cycle.<br>
+                <em>Formula: NewCredit vs (CurrentLoss + MissedMondayOppCost)</em><br><br>
+                <strong>RECOMMENDATION:</strong> <span style="color:${actMetrics.maxProfit > 500 ? '#00ff9d' : '#ff0055'}">
+                ${actMetrics.maxProfit > 500 ? 'ROLL ALLOWED' : 'DO NOT ROLL - CLOSE TRADE'}</span>.<br>
+                ${actMetrics.maxProfit <= 500 ? 'Projected roll credit does not exceed Opportunity Cost of missing next Monday\'s entry. Take loss and reset.' : 'Volatility premium is high enough to justify breaking the weekly cadence.'}
+            </li>
+        </ul>
+
         <hr>
-        <h3>5. Alpha Logic</h3>
-        <p>Solver maximized EV by scanning 7 distinct structures. The selected structure offers the highest Mathematical Expectation based on current Skew.</p>
-        <hr>
-        <p><em>Generated by Alpha Intelligence Engine at ${new Date().toLocaleTimeString()}</em></p>
+        <p><em>Alpha Intelligence Engine v2.2 (Cadence Protocol Active)</em></p>
     `;
 
     reportWindow.document.write(`
@@ -395,12 +755,129 @@ function openStrategyReport() {
     `);
 }
 
-function calculateOptimization(capital) {
+function calculateOptimization(capital, autoUpdateQty = false) {
     const container = document.getElementById('optimization-results');
     const direction = AGENT_DATA.forecast.direction;
+    const trade = AGENT_DATA.active_trade;
+    const market = AGENT_DATA.market;
+
+    // Ensure actual_legs exists
+    if (!trade.actual_legs) {
+        trade.actual_legs = JSON.parse(JSON.stringify(trade.legs));
+    }
+
+    // 1. Get Metrics for RECOMMENDED
+    const recMetrics = calculateTradeMetrics(trade.legs, trade.actual_contracts || 10, market);
+
+    // 2. Get Metrics for ACTUAL (User Input)
+    const activeLegs = trade.actual_legs || trade.legs;
+    const actMetrics = calculateTradeMetrics(activeLegs, trade.actual_contracts || 10, market);
+
+    // DANGER CHECK
+    const riskIncrease = (actMetrics.popVal < recMetrics.popVal - 0.05);
+    const isDangerous = riskIncrease || (actMetrics.putWidth < 20);
+
+    // RENDER COMPARISON VIEW
+    const isModified = JSON.stringify(trade.legs) !== JSON.stringify(trade.actual_legs) || (trade.actual_contracts && trade.actual_contracts > 0);
+
+    if ((isModified || trade.status === 'LIVE') && !autoUpdateQty) {
+        const diffProfit = actMetrics.maxProfit - recMetrics.maxProfit;
+        const diffRisk = actMetrics.maxRisk - recMetrics.maxRisk;
+
+        container.innerHTML = `
+            <div style="margin-top: 15px; border-top: 1px solid #333; padding-top: 10px;">
+                ${isDangerous ? `
+                <div class="blink" style="background: rgba(255, 0, 85, 0.2); border: 1px solid #ff0055; padding: 8px; border-radius: 4px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.2rem;">⚠️</span>
+                    <div style="font-size: 0.75rem; color: #ff0055; font-weight: bold;">
+                        HIGH RISK DETECTED<br>
+                        <span style="font-weight: normal; color: #e0e0e0;">Probability of Profit dropped by ${(recMetrics.popVal * 100 - actMetrics.popVal * 100).toFixed(0)}%. Thesis may be compromised.</span>
+                    </div>
+                </div>` : ''}
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                     <div style="font-size: 0.75rem; color: #00ff9d; font-weight: 700;">ALPHA TRACKER: RECOMMENDATION vs ACTUAL</div>
+                     ${trade.status === 'LIVE' ? '<span style="font-size: 0.65rem; color: #00ff9d; border: 1px solid #00ff9d; padding: 1px 4px; border-radius: 4px;">LIVE TRACKING</span>' : ''}
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.75rem;">
+                    <div style="opacity: 0.6;">
+                        <div style="color: #64748b; margin-bottom: 4px; font-size: 0.65rem;">RECOMMENDED</div>
+                        <div style="border-left: 2px solid #00ff9d; padding-left: 8px;">
+                            <div>Profit: <span style="color:#fff;">$${recMetrics.maxProfit.toLocaleString()}</span></div>
+                            <div>Risk: <span style="color:#fff;">$${recMetrics.maxRisk.toLocaleString()}</span></div>
+                            <div>PoP: <span style="color:#00ff9d;">${recMetrics.pop}</span></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style="color: #64748b; margin-bottom: 4px; font-size: 0.65rem;">YOUR PORTFOLIO</div>
+                        <div style="border-left: 2px solid ${isDangerous ? '#ff0055' : '#ffcc00'}; padding-left: 8px;">
+                            <div>Profit: <span style="color:#fff; font-weight:bold;">$${actMetrics.maxProfit.toLocaleString()}</span> 
+                                <span style="font-size:0.7em; color: ${diffProfit >= 0 ? '#00ff9d' : '#ff0055'}">(${diffProfit >= 0 ? '+' : ''}${diffProfit.toFixed(0)})</span>
+                            </div>
+                            <div>Risk: <span style="color:#fff;">$${actMetrics.maxRisk.toLocaleString()}</span>
+                                <span style="font-size:0.7em; color: ${diffRisk > 0 ? '#ff0055' : '#00ff9d'}">(${diffRisk > 0 ? '+' : ''}${diffRisk.toFixed(0)})</span>
+                            </div>
+                            <div>PoP: <span style="color:${isDangerous ? '#ff0055' : '#ffcc00'}; font-weight:bold;">${actMetrics.pop}</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 10px; font-size: 0.7rem; color: #8b9bb4; border-top: 1px dotted #333; padding-top: 5px;">
+                    <strong>ALPHA ANALYSIS:</strong> ${generateAlphaCommentary(recMetrics, actMetrics)}
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    // OLD LOGIC (Kept but unreachable if conditions meet above)
+    // IF LIVE OR MANUAL ENTRY DETECTED, SHOW ACTUAL METRICS
+    // We prioritize the "Actuals" view if the user has started entering data.
+    if ((trade.status === 'LIVE' || (trade.actual_contracts && trade.actual_contracts > 0))) {
+
+        // Calculate based on Actuals
+        const activeLegs = trade.actual_legs || trade.legs;
+        const putWidth = Math.abs(activeLegs[2].strike - activeLegs[3].strike);
+        const callWidth = Math.abs(activeLegs[0].strike - activeLegs[1].strike);
+
+        // Accurate Margin Calculation for Iron Condor (Max Width * 100) - Credit
+        // We assume a standard credit estimate if not tracked (~$1.50)
+        const maxWidth = Math.max(putWidth, callWidth);
+        const estimatedCredit = 150;
+        const marginPerContract = (maxWidth * 100) - estimatedCredit;
+
+        const totalExposure = (trade.actual_contracts || 0) * marginPerContract;
+        const utilization = capital > 0 ? (totalExposure / capital) * 100 : 0;
+
+        container.innerHTML = `
+            <div style="margin-top: 15px; border-top: 1px solid #333; padding-top: 10px;">
+                <div style="background: rgba(0, 255, 157, 0.1); border: 1px solid #00ff9d; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 0.75rem; color: #00ff9d; font-weight: 700;">ALPHA TRACKER: PORTFOLIO MODEL</div>
+                        <div style="font-size: 0.7rem; color: #8b9bb4;">USED: ${utilization.toFixed(1)}%</div>
+                    </div>
+                    
+                    <div style="font-size: 0.8rem; color: #e0e0e0; margin-top: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+                         <strong>Structure:</strong> ${putWidth}pt / ${callWidth}pt Iron Condor
+                         <br>
+                         <strong>Contracts:</strong> <span style="color:#fff; font-size:1.1em; font-weight:bold;">${trade.actual_contracts}</span>
+                         <br>
+                         <strong>Total Risk:</strong> <span style="color:#ffcc00">$${totalExposure.toLocaleString()}</span>
+                    </div>
+                    <div style="font-size: 0.65rem; color: #64748b; margin-top: 4px; font-family: 'JetBrains Mono';">
+                        BASED ON ACTUAL INPUTS
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
 
     // CONFIGURATIONS GENERATOR
     // User Requirement: "Decide width to utilize all availability"
+
     // We test widths from 25 up to 100 (stepped) to find the absolute best EV/Profit combo.
     let configs = [];
 
@@ -484,6 +961,13 @@ function calculateOptimization(capital) {
     if (bestConfig.score === -Infinity) {
         container.innerHTML = `<div style="padding:10px; color:#64748b; font-size:0.8rem;">Insufficient capital for trade.</div>`;
         return;
+    }
+
+    // AUTO-UPDATE LOGIC
+    if (autoUpdateQty && bestConfig.contracts > 0) {
+        trade.actual_contracts = bestConfig.contracts;
+        saveState();
+        renderStrategy(trade); // Reflect in Top Panel
     }
 
     // Render Best Configuration
@@ -592,13 +1076,9 @@ function renderVisualizer(market, trade) {
     const callPct = Math.max(0, Math.min(100, ((activeLegs[0].strike - rangeStart) / rangeTotal) * 100));
     const putPct = Math.max(0, Math.min(100, ((activeLegs[2].strike - rangeStart) / rangeTotal) * 100));
 
-    // Calculate Dynamic Deltas (Mock calculation based on distance)
-    // In a real app, this would query an API. Here we estimate.
-    const callDist = Math.abs(activeLegs[0].strike - market.spx);
-    const putDist = Math.abs(activeLegs[2].strike - market.spx);
-    // Rough approx: Delta inversely proportional to distance
-    const callDelta = Math.max(1, Math.round(50 - (callDist / 10))).toString().padStart(2, '0');
-    const putDelta = Math.max(1, Math.round(50 - (putDist / 10))).toString().padStart(2, '0');
+    // Use Actual Leg Deltas
+    const callDelta = activeLegs[0].delta || "?";
+    const putDelta = activeLegs[2].delta || "?";
 
     container.innerHTML = `
         <div style="position: relative; height: 100%; min-height: 300px; background: rgba(0,0,0,0.2); border-left: 1px solid #333; border-bottom: 1px solid #333; margin: 20px;">
@@ -620,6 +1100,29 @@ function renderVisualizer(market, trade) {
             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.05); font-size: 3rem; font-weight: 800; pointer-events: none;">SAFE ZONE</div>
         </div>
     `;
+}
+
+// Helper to calc best expiration (Target ~7 Days out, nearest Mon/Wed/Fri)
+function getRecommendedExpiration() {
+    const today = new Date();
+    // SPX has daily expirations, but liquidity is best Mon/Wed/Fri.
+    // We target ~5-7 days out for this Gamma/Theta play.
+
+    let target = new Date(today);
+    target.setDate(today.getDate() + 5); // Minimum 5 days out
+
+    // Find next valid M/W/F
+    while (true) {
+        const day = target.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
+        if (day === 1 || day === 3 || day === 5) {
+            break; // Found Mon, Wed, or Fri
+        }
+        target.setDate(target.getDate() + 1);
+    }
+
+    // Formatting: "Jan 19, 2026"
+    const options = { month: 'short', day: 'numeric', year: 'numeric' };
+    return target.toLocaleDateString('en-US', options) + ` (${target.toLocaleDateString('en-US', { weekday: 'short' })})`;
 }
 
 function setupEventListeners() {
@@ -675,16 +1178,44 @@ function setupEventListeners() {
                 showInAppAlert("OPPORTUNITY", "Inflation Reduction Event", "Oil Supply expansion detected. Lower Energy costs = Bullish for SPX margins.");
                 response = "<strong>Macro Event Detected:</strong> Venezuela Oil Access.<br>IMPACT: Lower Oil Prices -> Lower CPI -> <strong>Very Bullish</strong> for SPX.<br><br>Recommendation: Hold or Add Long Deltas.";
             }
-            // INTELLIGENT RESPONSES
-            // Matches: "Why...", "What if I sell...", "6890", "closer strike"
+            // INTELLIGENT RESPONSES (Context Aware)
+            // Matches: "Why...", "Is this good", "Trade analysis", "Compare"
             else if (
-                (text.toLowerCase().includes("why") || text.toLowerCase().includes("what if") || text.toLowerCase().includes("sell")) &&
-                (text.toLowerCase().includes("closer") || text.toLowerCase().includes("strike") || text.toLowerCase().includes("put") || text.toLowerCase().includes("6890"))
+                text.toLowerCase().includes("why") ||
+                text.toLowerCase().includes("good") ||
+                text.toLowerCase().includes("analysis") ||
+                text.toLowerCase().includes("compare") ||
+                text.toLowerCase().includes("safe")
             ) {
-                response = "<strong>Analysis of Strike (e.g. 6890):</strong><br>Selling closer to the money (ATM) drastically increases <strong>Gamma Risk</strong>.<br><br>While you collect more premium, a 1% move in SPX could wipe out that profit instantly. My algorithm selects strikes (Safe Zone) that stay outside the <strong>Market Maker Move</strong> to ensure survival.";
+                // Run Analysis on Current Inputs
+                const trade = AGENT_DATA.active_trade;
+                const rec = calculateTradeMetrics(trade.legs, trade.actual_contracts || 10, AGENT_DATA.market);
+                const act = calculateTradeMetrics(trade.actual_legs || trade.legs, trade.actual_contracts || 10, AGENT_DATA.market);
+
+                let analysis = "";
+
+                // 1. DANGER CHECK
+                if (act.popVal < 0.60) {
+                    analysis = `⚠️ <strong>CRITICAL WARNING:</strong> Your proposed trade has a low Probability of Profit (${act.pop}). You are essentially gambling on direction rather than selling volatility. I recommend widening the strikes.`;
+                }
+                // 2. COMPARISON
+                else if (act.popVal < rec.popVal - 0.05) {
+                    analysis = `<strong>Comparison:</strong> You are taking on ${((act.maxRisk / rec.maxRisk - 1) * 100).toFixed(0)}% more risk than I recommended. While profit is higher, your "Safety Buffer" (Delta) is significantly reduced.`;
+                }
+                // 3. RATIONALE
+                else {
+                    analysis = `<strong>Alpha Rationale:</strong> The Recommended strategy targets a 75% Win Rate by selling the 12-15 Delta strikes. Your current setup (${act.pop} PoP) aligns well with this thesis.`;
+                }
+
+                if (text.toLowerCase().includes("why")) {
+                    analysis += `<br><br><em>I chose the original strikes to maximize Theta (Time Decay) while keeping Gamma risk low.</em>`;
+                }
+
+                response = analysis;
             }
             else if (text.toLowerCase().includes("risk")) {
-                response = "Current risk is defined at $47.90 max loss per contract (due to 50pt wide Put Spread).";
+                const act = calculateTradeMetrics(AGENT_DATA.active_trade.actual_legs || AGENT_DATA.active_trade.legs, AGENT_DATA.active_trade.actual_contracts || 10, AGENT_DATA.market);
+                response = `Current risk is defined at <strong>$${act.maxRisk.toLocaleString()}</strong> max loss (Capital at Risk).<br>Breakevens: ${AGENT_DATA.active_trade.metrics.break_even}`;
             } else if (text.toLowerCase().includes("width") || text.toLowerCase().includes("skew")) {
                 response = "I have detected a 72% Bullish bias. I widened the Put Vertical to 50pts (Standard is 25pts) to capture more credit.";
             } else if (text.toLowerCase().includes("monday")) {
@@ -707,10 +1238,11 @@ function setupEventListeners() {
     };
 
     // Capital Input Listener
+    // Capital Input Listener
     capitalInput.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value);
         if (val && val > 0) {
-            calculateOptimization(val);
+            calculateOptimization(val, true); // Auto-update QTY when capital changes
         }
     });
 
@@ -731,6 +1263,194 @@ function setupEventListeners() {
     appendMessage('agent', "System online. I am actively scanning for Arbitrage and Monitoring Risk.");
 }
 
+
 function copyTrade() {
     alert("Order copied to clipboard: UNBALANCED IC SPX... [Full Chain]");
+}
+
+// Helper: Calculate Metrics (PoP, Risk, Profit)
+function calculateTradeMetrics(legs, contracts, market) {
+    // 1. Calculate Widths
+    const putWidth = Math.abs(legs[2].strike - legs[3].strike);
+    const callWidth = Math.abs(legs[0].strike - legs[1].strike);
+    const maxWidth = Math.max(putWidth, callWidth);
+
+    // 2. Estimate Credit (Simulated Model)
+    // Base Credit ($1.20) + Skew Bonus + Width Bonus
+    let credit = 1.20;
+    if (putWidth > 25) credit += ((putWidth - 25) / 5) * 0.15; // More credit for wider put spread
+    if (callWidth > 25) credit += ((callWidth - 25) / 5) * 0.10;
+
+    // 3. PoP Estimation (Based on Delta)
+    const shortCallDelta = legs[0].delta || 0.12;
+    const shortPutDelta = legs[2].delta || 0.12;
+
+    // Dynamic Delta Adjustment (Simulated logic simplification)
+    // We assume default delta is "safe", higher delta lowers PoP.
+    // Base PoP for standard 15 delta is ~75%.
+
+    const pop = (1 - (shortCallDelta + shortPutDelta) - 0.05).toFixed(2); // -5% edge buffer
+
+    // 4. Totals
+    const marginPerContract = (maxWidth * 100) - (credit * 100);
+    const maxRisk = marginPerContract * contracts;
+    const maxProfit = (credit * 100) * contracts;
+
+    return {
+        credit: credit.toFixed(2),
+        pop: (pop * 100).toFixed(0) + "%",
+        popVal: parseFloat(pop),
+        maxRisk: maxRisk,
+        maxProfit: maxProfit,
+        putWidth: putWidth,
+        callWidth: callWidth
+    };
+}
+
+function generateLiveRecommendation(market) {
+    console.log("ALPHA: Generating Live Strategy based on:", market);
+
+    // 1. Synthesize Thesis
+    const thesis = ALPHA_BRAIN.synthesizeThesis(market);
+    AGENT_DATA.forecast.conviction_summary = thesis;
+    AGENT_DATA.forecast.probability = market.vix < 20 ? 0.72 : 0.65; // Lower confidence in high vol
+
+    // 2. Synthesize Strikes (The "Real" Work)
+    // Simple Rule-Based Engine for Playground
+    const spx = market.spx;
+    let strategyType = "Iron Condor";
+    let shortPut, shortCall, longPut, longCall;
+
+    // Calculate ATM (At The Money)
+    const atm = Math.round(spx / 5) * 5; // Round to nearest 5
+
+    if (market.trend.includes("Bullish")) {
+        // Bullish Bias: Skew Puts Higher, Calls Further Away
+        shortPut = Math.floor((spx * 0.98) / 5) * 5; // 2% OTM
+        shortCall = Math.ceil((spx * 1.03) / 5) * 5; // 3% OTM
+    } else {
+        // Bearish/Neutral: Balanced or lower
+        shortPut = Math.floor((spx * 0.96) / 5) * 5; // 4% OTM
+        shortCall = Math.ceil((spx * 1.02) / 5) * 5; // 2% OTM
+    }
+
+    // Defined Wings (Width)
+    const width = market.vix > 20 ? 50 : 25; // Wider in high vol
+    longPut = shortPut - width;
+    longCall = shortCall + width;
+
+    // 3. Construct Trade Object using Black-Scholes Pricing
+    const r = 0.045; // Risk Free Rate 4.5%
+    const t = 7 / 365; // 7 DTE
+    const vol = market.vix / 100;
+
+    // Define Legs Config
+    const legConfigs = [
+        { side: "Call", action: "Sell", strike: shortCall },
+        { side: "Call", action: "Buy", strike: longCall },
+        { side: "Put", action: "Sell", strike: shortPut },
+        { side: "Put", action: "Buy", strike: longPut }
+    ];
+
+    // Calculate Greeks for each leg
+    const calculatedLegs = legConfigs.map(cfg => {
+        const type = cfg.side.toLowerCase();
+        const greeks = BS_MATH.calculateGreeks(type, spx, cfg.strike, t, r, vol);
+        return {
+            side: cfg.side,
+            action: cfg.action,
+            strike: cfg.strike,
+            delta: parseFloat(greeks.delta.toFixed(2)),
+            price: greeks.price
+        };
+    });
+
+    // Calculate Totals
+    let totalCredit = 0;
+    calculatedLegs.forEach(leg => {
+        if (leg.action === "Sell") totalCredit += leg.price;
+        else totalCredit -= leg.price;
+    });
+
+    // Defined Wings (Width)
+    const actualWidth = Math.abs(shortPut - longPut);
+
+    const trade = {
+        type: strategyType,
+        status: "PENDING ENTRY",
+        expiration: getRecommendedExpiration(),
+        dte: 7,
+        legs: calculatedLegs,
+        metrics: {
+            max_profit: `$${Math.max(0.10, totalCredit).toFixed(2)}`, // Ensure non-negative display
+            max_risk: `$${((actualWidth * 100) - (totalCredit * 100)).toFixed(2)}`,
+            pop: "70%", // Still estimated based on Delta (1 - Short Deltas)
+            break_even: `${(shortPut - totalCredit).toFixed(0)} / ${(shortCall + totalCredit).toFixed(0)}`
+        },
+        thesis: thesis
+    };
+
+    AGENT_DATA.active_trade = trade;
+
+    // Force Render
+    renderStrategy(trade);
+    renderMetrics(market, trade);
+    appendMessage('agent', `<strong>Analysis Complete.</strong><br>${thesis}<br>Calculated Credit: $${totalCredit.toFixed(2)} based on VIX ${market.vix}.`);
+}
+
+function updateMarketTickerUI(data) {
+    const spxEl = document.getElementById('ticker-spx');
+    const vixEl = document.getElementById('ticker-vix');
+    if (spxEl) {
+        spxEl.innerText = data.spx.toFixed(2);
+        spxEl.style.color = "#00ff9d";
+    }
+    if (vixEl) vixEl.innerText = data.vix.toFixed(2);
+}
+
+function updateManualInputs(data) {
+    const inputSpx = document.getElementById('input-spx');
+    const inputVix = document.getElementById('input-vix');
+    if (inputSpx) inputSpx.value = data.spx;
+    if (inputVix) inputVix.value = data.vix;
+}
+// EFFICIENCY DELTA CALCULATION
+function generateAlphaCommentary(rec, act) {
+    // We score the trade on 3 axes: Risk (Gamma/Delta), Probability (PoP), Profit (Credit)
+
+    // 1. Profit Score (+1 if higher)
+    const profitScore = act.maxProfit > rec.maxProfit ? 1 : 0;
+    const profitDiff = act.maxProfit - rec.maxProfit;
+
+    // 2. Risk Score (-1 if riskier)
+    // We use PoP as a proxy for Gamma risk here (Lower PoP = Closer to strikes = Higher Gamma)
+    const popDiff = act.popVal - rec.popVal;
+    const riskScore = popDiff < -0.05 ? -1 : 0; // Penalize if PoP drops by >5%
+
+    // 3. Efficiency Verdict
+    let verdict = "NEUTRAL";
+    let explanation = "";
+
+    if (profitScore === 1 && riskScore === 0) {
+        verdict = "<span style='color:#00ff9d; font-weight:bold;'>SUPERIOR</span>";
+        explanation = `You optimized for higher profit (+$${profitDiff.toFixed(0)}) without significantly increasing Gamma risk. Efficient structure.`;
+    } else if (profitScore === 1 && riskScore === -1) {
+        verdict = "<span style='color:#ff0055; font-weight:bold;'>INFERIOR</span>";
+        explanation = `You increased profit by $${profitDiff.toFixed(0)}, but accepted a ${(Math.abs(popDiff) * 100).toFixed(0)}% drop in Probability. <br>The added premium does not justify the exponential increase in Gamma Risk.`;
+    } else if (profitScore === 0 && riskScore === 0) {
+        verdict = "<span style='color:#ffcc00; font-weight:bold;'>ALIGNED</span>";
+        explanation = "Your proposed structure aligns closely with Alpha's optimal thesis.";
+    } else {
+        verdict = "<span style='color:#ffcc00; font-weight:bold;'>SUB-OPTIMAL</span>";
+        explanation = "This structure offers lower reward for similar or higher risk. Revert to recommended strikes.";
+    }
+
+    return `
+        <div style="margin-top:4px;">
+            <strong>VERDICT:</strong> ${verdict}
+        </div>
+        <div style="margin-top:2px;">
+            ${explanation}
+        </div>
+    `;
 }

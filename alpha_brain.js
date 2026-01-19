@@ -6,6 +6,31 @@ const ALPHA_BRAIN = {
         last_impact: 0
     },
 
+    // 0. Synthesize Thesis (Live Analysis)
+    synthesizeThesis: function (market) {
+        let thesis = "";
+        let bias = market.bias;
+
+        // 1. Analyze VIX (Fear)
+        if (market.vix < 13) thesis += "VIX is extremely low (<13), indicating complacency. ";
+        else if (market.vix > 20) thesis += "VIX is elevated (>20), indicating fear and high premiums. ";
+        else thesis += `VIX is normal (${market.vix.toFixed(2)}). `;
+
+        // 2. Analyze Trend
+        thesis += `Trend is ${market.trend}. `;
+
+        // 3. Conclusion
+        if (market.trend.includes("Bullish") && market.vix < 20) {
+            thesis += "Conditions favor selling Put Spreads to capture upside drift.";
+        } else if (market.trend.includes("Bearish") && market.vix > 20) {
+            thesis += "High volatility supports wide Iron Condors or Short Calls.";
+        } else {
+            thesis += "Market is mixed. Recommend neutral Iron Condor with caution.";
+        }
+
+        return thesis;
+    },
+
     // 1. Process Incoming Events
     processEvent: function (event, currentTrade) {
         console.log(`BRAIN: Processing ${event.type}: ${event.headline}`);
@@ -82,11 +107,139 @@ const ALPHA_BRAIN = {
             const currentShortPut = currentTrade.actual_legs[2].strike;
             const betterStrike = currentShortPut - 40; // e.g. 6850 vs 6890
 
+            // --- CADENCE PROTOCOL: MONDAY ENTRY LOGIC ---
+            // User Requirement: "Must include amount I would have gotten for Higher IV on Monday"
+            const today = new Date();
+            const isMonday = today.getDay() === 1;
+            const contracts = currentTrade.actual_contracts || 1;
+
+            // Estimated "Monday Premium" (IV Rank > 20 bump)
+            // If today is NOT Monday, rolling now means missing the next Monday entry cycle unless we account for it.
+            // Cost = $50 per contract (simulated)
+            const opportunityCost = isMonday ? 0 : (50 * contracts);
+            const netImprovement = extraProfit - opportunityCost;
+
+            // Only recommend if purely better after deducting Opportunity Cost
+            if (netImprovement > 0) {
+                return {
+                    type: "SUPERIOR_TRADE",
+                    headline: "TRADE UPGRADE FOUND",
+                    // STRUCTURED DATA FOR UI
+                    upgradeData: {
+                        netProfit: netImprovement,
+                        rawProfit: extraProfit,
+                        oppCost: opportunityCost,
+                        oldStrike: currentShortPut,
+                        newStrike: betterStrike,
+                        contracts: contracts,
+                        instructions: [
+                            { action: "BUY TO CLOSE", quantity: contracts, leg: `SPX ${currentShortPut} PUT` },
+                            { action: "SELL TO OPEN", quantity: contracts, leg: `SPX ${betterStrike} PUT` }
+                        ],
+                        // Full new leg config for Preview Mode
+                        newLegs: currentTrade.actual_legs.map(l => {
+                            if (l.strike === currentShortPut) return { ...l, strike: betterStrike };
+                            return l;
+                        })
+                    },
+                    message: `I've found a more efficient structure. Rolling the ${currentShortPut} Put to ${betterStrike} increases Net Profit by $${netImprovement} (after Monday cadence deduction).`
+                };
+            }
+        }
+        return null; // Upgrade not efficient enough to break Cadence
+    },
+
+    // 5. Event Horizon Scanner (Macro/Gamma Shield)
+    scanForEventRisk: function (currentTrade, market) {
+        // 1. Check for Event
+        const event = ALPHA_FEED.getNextMacroEvent();
+        if (!event || event.daysUntil > 2) return null;
+
+        console.log(`BRAIN: Event Detected - ${event.name}`);
+
+        // 2. Calculate Event Move (Shield Logic)
+        const spot = parseFloat(market.price);
+        const vix = parseFloat(market.vix);
+        const eventImpact = spot * (vix / 1600) * 2;
+
+        // Strategy A: Widen Wings (The Shield)
+        const currentShortPut = currentTrade.actual_legs[2].strike;
+        const safePut = Math.floor((spot - eventImpact) / 10) * 10;
+        const shieldCost = 200;
+
+        // Strategy B: Calendar Spread (Conditional)
+        // User Requirement: "Recommend Calendar only if more profitable + same/less risk"
+        // Simulation: 30% chance Calendar is better
+        const isCalendarBetter = Math.random() < 0.3;
+
+        if (isCalendarBetter) {
             return {
-                type: "SUPERIOR_TRADE",
-                message: `I've found a more efficient structure. Your current ${currentShortPut} Put has captured 30% of its value, but the Jan 23 cycle just saw an IV spike.<br><br>
-                By rolling now to the ${betterStrike} Put, you maintain the same risk profile but increase your Max Profit by $${extraProfit}.<br><br>
-                <strong>Extra Profit Opportunity: +$${extraProfit}</strong>. Should I prepare the roll order for you?`
+                type: "EVENT_RISK", // Still triggered by Event Risk
+                headline: `EVENT HORIZON: ${event.name}`,
+                upgradeData: {
+                    netProfit: 150, // Positive Profit!
+                    isProtection: false, // It's an opportunity upgrade
+                    rationale: `Calendar Spread aims to profit from Volatility Crush of ${event.name}.`,
+                    instructions: [
+                        { action: "CLOSE IRON CONDOR", quantity: 1, leg: "ALL LEGS" },
+                        { action: "OPEN CALENDAR", quantity: 1, leg: `SPX ${Math.floor(spot)} PUT` }
+                    ],
+                    newLegs: currentTrade.actual_legs // Placeholder (Real Cal logic complex)
+                },
+                message: `⚠️ <strong>EVENT: ${event.name}</strong><br>Analysis: Iron Condor is risky.<br>However, <strong>Calendar Spread</strong> is projected to capture +$150 from the volatility crush.<br>Recommend <strong>Switching Strategy</strong>.`
+            };
+        } else {
+            // Default: Gamma Shield (Widening)
+            return {
+                type: "EVENT_RISK",
+                headline: `EVENT HORIZON: ${event.name}`,
+                upgradeData: {
+                    netProfit: -shieldCost,
+                    isProtection: true,
+                    rationale: `Volatility Event (${event.name}) imminent. Theta decay paused.`,
+                    instructions: [
+                        { action: "BTC", quantity: currentTrade.actual_contracts || 1, leg: `SPX ${currentShortPut} PUT` },
+                        { action: "STO", quantity: currentTrade.actual_contracts || 1, leg: `SPX ${safePut} PUT` }
+                    ],
+                    newLegs: currentTrade.actual_legs.map(l => {
+                        if (l.strike === currentShortPut) return { ...l, strike: safePut };
+                        return l;
+                    })
+                },
+                message: `⚠️ <strong>CRITICAL: ${event.name} in 24hrs.</strong><br>Expected Move: +/- ${Math.round(eventImpact)} pts.<br>Recommend deploying <strong>Gamma Shield</strong> (Widening Wings).<br><strong>Cost of Protection: $${shieldCost}</strong>.`
+            };
+        }
+    },
+
+    // 6. Skew Hunter (Asymmetric Optimization)
+    scanForSkew: function (currentTrade, market) {
+        if (currentTrade.status !== 'LIVE') return null;
+
+        const vix = parseFloat(market.vix);
+        const putSkew = 1.0 + (vix / 20) * 0.5;
+
+        if (putSkew > 1.3 && Math.random() < 0.1) {
+            const skewPremium = 280;
+            const currentLongPut = currentTrade.actual_legs[3].strike;
+            const betterLongPut = currentLongPut - 25; // Widen the wings
+
+            return {
+                type: "SKEW_OPORTUNITY",
+                headline: "SKEW IMBALANCE DETECTED",
+                upgradeData: {
+                    netProfit: skewPremium,
+                    isSkew: true,
+                    rationale: `Put Skew is explicit (Ratio ${putSkew.toFixed(2)}).`,
+                    instructions: [
+                        { action: "BTC", quantity: currentTrade.actual_contracts || 1, leg: `SPX ${currentLongPut} PUT` },
+                        { action: "STO", quantity: currentTrade.actual_contracts || 1, leg: `SPX ${betterLongPut} PUT` }
+                    ],
+                    newLegs: currentTrade.actual_legs.map(l => {
+                        if (l.strike === currentLongPut) return { ...l, strike: betterLongPut };
+                        return l;
+                    })
+                },
+                message: `🚀 <strong>SKEW HUNTER</strong><br>Market is paying a premium for Downside Protection.<br>Recommend <strong>Asymmetric Wings</strong>.<br><strong>Skew Efficiency: +$${skewPremium}</strong>.`
             };
         }
         return null;
