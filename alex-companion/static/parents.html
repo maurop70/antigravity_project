@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alexa | Parent Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+
+<body class="dashboard-body">
+
+    <div class="dashboard-container">
+        <!-- Sidebar / Header -->
+        <header class="dashboard-header">
+            <div class="logo-area">
+                <img src="/icon.png" alt="Alexa Logo" class="db-logo">
+                <h1>Parent Dashboard</h1>
+            </div>
+            <p class="subtitle">Monitor progress & Guide Alexa's teaching</p>
+            <a href="/" class="back-link">← Back to Chat</a>
+        </header>
+
+        <!-- Main Content Grid -->
+        <main class="dashboard-grid">
+
+            <!-- SECTION 1: ADD INPUT -->
+            <section class="card input-card">
+                <h2>Add Learning Goal or Comment</h2>
+                <div class="input-group">
+                    <label>Type of Input:</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="inputType" value="vocabulary" checked> Vocabulary Word</label>
+                        <label><input type="radio" name="inputType" value="comment"> General Comment / Goal</label>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Content:</label>
+                    <textarea id="parent-input"
+                        placeholder="E.g., 'Teach him the word diligent' or 'Focus on using full sentences.'"></textarea>
+                </div>
+                <button id="submit-input-btn" class="action-btn">Submit to Alexa</button>
+                <div id="loading-indicator" class="hidden">Parsing your request...</div>
+            </section>
+
+            <!-- SECTION 2: FEEDBACK FEED -->
+            <section class="card feed-card">
+                <h2>Alexa's Learning Plan</h2>
+                <div id="feed-container" class="feed-list">
+                    <!-- Dynamic Items -->
+                </div>
+            </section>
+
+            <!-- SECTION 3: PROGRESS LOG -->
+            <section class="card progress-card" style="grid-column: 1 / -1;">
+                <h2>User Progress Log</h2>
+                <div id="progress-container" class="feed-list">
+                    <p style="color:#636e72; padding:20px; text-align:center;">Alexa will add automatic daily summaries
+                        here as she interacts with him.</p>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        const feedContainer = document.getElementById('feed-container');
+        const submitBtn = document.getElementById('submit-input-btn');
+        const inputField = document.getElementById('parent-input');
+        const loadingIndicator = document.getElementById('loading-indicator');
+
+        // Load Data on Start
+        fetchData();
+
+        async function fetchData() {
+            const res = await fetch('/api/parent/data');
+            const data = await res.json();
+            renderFeed(data.parent_inputs);
+            renderProgress(data.progress_log);
+        }
+
+        function renderProgress(logs) {
+            const container = document.getElementById('progress-container');
+            if (!logs || logs.length === 0) return;
+
+            container.innerHTML = '';
+            logs.forEach(log => {
+                const el = document.createElement('div');
+                el.className = 'feed-item';
+                el.innerHTML = `
+                    <div class="feed-header">
+                        <span class="badge vocabulary">SESSION SUMMARY</span>
+                        <span class="date">${new Date(log.date).toLocaleString()}</span>
+                    </div>
+                    <div class="feed-body">
+                        <p class="parent-text">${log.note}</p>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function renderFeed(inputs) {
+            feedContainer.innerHTML = '';
+            if (!inputs) return;
+            inputs.forEach(item => {
+                const el = document.createElement('div');
+                el.className = `feed-item status-${item.status}`;
+                el.innerHTML = `
+                    <div class="feed-header">
+                        <span class="badge ${item.type}">${item.type.toUpperCase()}</span>
+                        <span class="date">${new Date(item.timestamp).toLocaleDateString()}</span>
+                    </div>
+                    <div class="feed-body">
+                        <p class="parent-text"><strong>You said:</strong> "${item.content}"</p>
+                        <div class="alexa-reply">
+                            <div class="alexa-avatar-small"></div>
+                            <p><strong>Alexa's Plan:</strong> ${item.alexa_response}</p>
+                        </div>
+                    </div>
+                    <div class="status-indicator">Status: ${item.status.toUpperCase()}</div>
+                `;
+                feedContainer.appendChild(el);
+            });
+        }
+
+        submitBtn.addEventListener('click', async () => {
+            const content = inputField.value.trim();
+            const type = document.querySelector('input[name="inputType"]:checked').value;
+
+            if (!content) return;
+
+            loadingIndicator.classList.remove('hidden');
+            submitBtn.disabled = true;
+
+            try {
+                const res = await fetch('/api/parent/input', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content, type })
+                });
+
+                if (res.ok) {
+                    inputField.value = '';
+                    fetchData(); // Refresh list
+                } else {
+                    alert("Error submitting input.");
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

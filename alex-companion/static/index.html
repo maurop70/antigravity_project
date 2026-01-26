@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat with Alexa</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Nunito:wght@400;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <h1>Alexa Companion</h1>
+            <button id="voice-toggle-btn" class="mode-btn">
+                <span class="icon">🎙️</span> Switch to Voice Mode
+            </button>
+        </header>
+
+        <!-- Chat Area -->
+        <div id="chat-container" class="chat-container">
+            <div class="message alexa-message">
+                Hi! I'm Alexa. I'm here to hang out and help directly. What's on your mind?
+            </div>
+        </div>
+
+        <!-- Avatar Overlay (Voice Mode) -->
+        <div id="avatar-overlay" class="avatar-overlay hidden">
+            <div class="avatar-frame">
+                <!-- Fallback to a styled div if image is missing -->
+                <img src="alexa_avatar.png" alt="Alexa Avatar" id="alexa-avatar-img"
+                    onerror="this.style.display='none'; document.getElementById('avatar-fallback').style.display='block'">
+                <div id="avatar-fallback" class="avatar-fallback" style="display:none;">👩</div>
+                <div class="avatar-glow"></div>
+            </div>
+            <div class="voice-status">Listening...</div>
+            <button id="stop-speak-btn" class="stop-btn hidden">⏹ Stop Speaking</button>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <label for="file-upload" class="attach-btn" title="Upload File">
+                📎
+            </label>
+            <input type="file" id="file-upload" class="hidden">
+
+            <input type="text" id="user-input" placeholder="Type your message here..." autocomplete="off">
+            <button id="send-btn" class="send-btn">Send</button>
+        </div>
+
+        <div id="file-preview" class="file-preview hidden">
+            <span id="file-name"></span>
+            <button id="clear-file">❌</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
