@@ -471,6 +471,130 @@ textarea:focus {
     color: #d63031;
 }
 
-.status-pending .status-indicator {
-    color: #fdcb6e;
+
+/* --- TABS --- */
+.tab-nav {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px;
+    background: var(--card-bg);
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #888;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-radius: 20px;
+    transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+    background-color: #f0f0f0;
+}
+
+.tab-btn.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* --- CLASSROOM VIEW --- */
+.classroom-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.course-card {
+    background: var(--card-bg);
+    /* Fallback or existing var? Using white might be safer if card-bg undef */
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    border: 1px solid #eee;
+}
+
+.course-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    border-bottom: 2px solid var(--secondary-color);
+    padding-bottom: 8px;
+}
+
+.course-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.assignment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.assignment-item {
+    background: #f9f9f9;
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.assignment-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.assignment-title {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.assignment-due {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.ask-alexa-btn {
+    background: var(--secondary-color);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.ask-alexa-btn:hover {
+    transform: scale(1.05);
+}
+
+.auth-warning {
+    text-align: center;
+    margin-top: 40px;
+    color: #666;
+}
+
+.auth-btn {
+    margin-top: 10px;
+    padding: 10px 20px;
+    background-color: #4285F4;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
 }

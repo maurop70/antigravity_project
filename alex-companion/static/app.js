@@ -339,6 +339,129 @@ async function speak(text) {
     }
 }
 
+// --- CLASSROOM TAB LOGIC ---
+
+function switchTab(tab) {
+    const chatContainer = document.getElementById('chat-container');
+    const classroomView = document.getElementById('classroom-view');
+    const inputArea = document.querySelector('.input-area');
+    const tabs = document.querySelectorAll('.tab-btn');
+
+    // Update Buttons
+    tabs.forEach(btn => {
+        if (btn.innerText.toLowerCase().includes(tab)) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    if (tab === 'chat') {
+        chatContainer.style.display = 'flex';
+        classroomView.style.display = 'none';
+        inputArea.style.display = 'flex'; // Chat needs input
+    } else {
+        chatContainer.style.display = 'none';
+        classroomView.style.display = 'flex';
+        inputArea.style.display = 'none'; // Classroom view is read-only + buttons
+
+        // Load Data
+        loadClassroomData();
+    }
+}
+
+async function loadClassroomData() {
+    const container = document.getElementById('classroom-view');
+    // Keep spinner briefly or structure
+    // If empty or first load
+    if (!container.querySelector('.course-card')) {
+        container.innerHTML = '<div class="auth-warning"><h3>Loading...</h3></div>';
+    }
+
+    try {
+        const res = await fetch('/api/classroom/data');
+        const data = await res.json();
+
+        if (!data.authenticated) {
+            container.innerHTML = `
+                <div class="auth-warning">
+                    <h3>Not Connected to Google Classroom</h3>
+                    <p>Please launch the authentication flow on the server.</p>
+                    <button class="auth-btn" onclick="fetch('/api/auth/classroom')">Launch Auth Window</button>
+                    <p style="font-size:0.8rem; margin-top:10px;">(Check server console for popup)</p>
+                </div>
+            `;
+            return;
+        }
+
+        if (data.courses.length === 0) {
+            container.innerHTML = '<div class="auth-warning"><h3>No active courses found.</h3></div>';
+            return;
+        }
+
+        container.innerHTML = ''; // Clear loading
+
+        data.courses.forEach(course => {
+            const card = document.createElement('div');
+            card.className = 'course-card';
+
+            let assignmentsHtml = '';
+            if (course.assignments.length === 0) {
+                assignmentsHtml = '<p style="color:#888; padding:10px;">No assignments due.</p>';
+            } else {
+                course.assignments.forEach(hw => {
+                    // Friendly Date
+                    let dueStr = hw.dueDate ? `${hw.dueDate.month}/${hw.dueDate.day}` : '';
+
+                    assignmentsHtml += `
+                        <div class="assignment-item">
+                            <div class="assignment-info">
+                                <span class="assignment-title">${hw.title}</span>
+                                ${dueStr ? `<span class="assignment-due">Due: ${dueStr}</span>` : ''}
+                            </div>
+                            <button class="ask-alexa-btn" onclick="askAboutAssignment('${escapeJs(course.name)}', '${escapeJs(hw.title)}')">
+                                Ask Alexa
+                            </button>
+                        </div>
+                    `;
+                });
+            }
+
+            card.innerHTML = `
+                <div class="course-header">
+                    <span class="course-title">${course.name}</span>
+                    <span style="font-size:0.8rem; color:#666;">${course.section}</span>
+                </div>
+                <div class="assignment-list">
+                    ${assignmentsHtml}
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+    } catch (e) {
+        container.innerHTML = `<div class="auth-warning" style="color:red"><h3>Error loading data: ${e}</h3></div>`;
+    }
+}
+
+function escapeJs(str) {
+    if (!str) return "";
+    return str.replace(/'/g, "\\'");
+}
+
+function askAboutAssignment(course, assignment) {
+    // Switch to Chat
+    switchTab('chat');
+
+    // Auto-send message
+    const prompt = `I need help with my ${course} assignment "${assignment}". What is it about?`;
+
+    // Simulate typing
+    const userInput = document.getElementById('user-input');
+    userInput.value = prompt;
+    sendMessage();
+}
+
 
 
 // Window load not strictly needed for this, but keeping clean cleanup if needed

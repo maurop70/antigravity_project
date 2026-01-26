@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from llm_client import alexa_client
+from classroom_client import classroom_client
 from duckduckgo_search import DDGS
 
 app = FastAPI(title="Alexa Companion")
@@ -92,7 +93,15 @@ async def chat_endpoint(request: ChatRequest):
         # Load active parent inputs and strategy to inject into context
         data = data_manager.load_data()
         
-        response_text = alexa_client.send_message(request.message, user_data=data)
+        # Check for Classroom triggers (simple keyword check for now, or always inject if auth'd)
+        # We'll inject it if it's explicitly asked or if we want to be proactive.
+        # For now, let's keep it proactive but lightweight - maybe valid for a session?
+        # Actually, let's just fetch it. If it's slow, we might need caching.
+        classroom_context = None
+        if "homework" in request.message.lower() or "assignment" in request.message.lower() or "class" in request.message.lower() or "school" in request.message.lower():
+             classroom_context = classroom_client.get_summary()
+
+        response_text = alexa_client.send_message(request.message, user_data=data, local_context=classroom_context)
         return ChatResponse(response=response_text)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -199,6 +208,41 @@ async def search_image_endpoint(request: SearchRequest):
     fallback_url = f"https://pollinations.ai/p/{encoded_query}?width=800&height=600&nologo=true"
     print(f"FALLBACK to Pollinations: {fallback_url}")
     return {"url": fallback_url}
+
+@app.get("/api/auth/classroom")
+async def auth_classroom():
+    """
+    Triggers the Google Classroom OAuth2 flow locally.
+    This will open a browser window on the server side (localhost).
+    """
+    try:
+        success = classroom_client.authenticate()
+        if success:
+            return {"status": "success", "message": "Authenticated with Google Classroom."}
+        else:
+            return {"status": "error", "message": "Authentication failed. Check server logs."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/classroom/summary")
+async def get_classroom_summary():
+    """
+    Returns the current classroom summary text.
+    """
+    try:
+        return {"summary": classroom_client.get_summary()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/classroom/data")
+async def get_classroom_data():
+    """
+    Returns structured JSON data for the UI.
+    """
+    try:
+        return classroom_client.get_courses_and_coursework()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Static Files (Frontend)
 # We mount this LAST so API routes take precedence

@@ -20,10 +20,23 @@
             </button>
         </header>
 
+        <!-- Tab Nav -->
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchTab('chat')">Chat</button>
+            <button class="tab-btn" onclick="switchTab('classroom')">Classroom</button>
+        </div>
+
         <!-- Chat Area -->
         <div id="chat-container" class="chat-container">
             <div class="message alexa-message">
                 Hi! I'm Alexa. I'm here to hang out and help directly. What's on your mind?
+            </div>
+        </div>
+
+        <!-- Classroom View (Hidden by default) -->
+        <div id="classroom-view" class="classroom-container hidden" style="display:none">
+            <div class="auth-warning">
+                <h3>Connecting to Classroom...</h3>
             </div>
         </div>
 
