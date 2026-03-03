@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alexa v2 - Parent Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #1f2937; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #111827; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
+        h2 { font-size: 1.25rem; margin-top: 30px; margin-bottom: 15px; color: #374151; }
+        
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 500; }
+        textarea, select, input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; margin-bottom: 10px; }
+        button { background-color: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 500; }
+        button:hover { background-color: #1d4ed8; }
+        
+        .log-list { list-style: none; padding: 0; }
+        .log-item { background: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
+        .log-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9em; color: #6b7280; }
+        .log-content { font-weight: 500; margin-bottom: 5px; }
+        .log-response { font-size: 0.95em; color: #059669; }
+        .tag { padding: 2px 8px; border-radius: 4px; font-size: 0.8em; text-transform: uppercase; background: #e5e7eb; color: #374151; }
+        .tag.accepted { background: #d1fae5; color: #065f46; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Parent Dashboard (Alexa v2)</h1>
+        
+        <div class="section">
+            <h2>Add New Directive</h2>
+            <div class="input-group">
+                <label>Input Type</label>
+                <select id="inputType">
+                    <option value="vocabulary">Vocabulary Word</option>
+                    <option value="goal">Learning Goal</option>
+                    <option value="feedback">Feedback/Comment</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Content</label>
+                <textarea id="inputContent" rows="3" placeholder="E.g., Please teach the word 'Procrastination'"></textarea>
+            </div>
+            <button onclick="submitInput()">Submit Directive</button>
+        </div>
+        
+        <div class="section">
+            <h2>Active Goals & History</h2>
+            <ul id="logList" class="log-list">
+                <!-- Items will be loaded here -->
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8002/api";
+
+        async function loadData() {
+            const res = await fetch(`${API_URL}/parent/data`);
+            const data = await res.json();
+            renderLog(data.parent_inputs || []);
+        }
+
+        async function submitInput() {
+            const type = document.getElementById('inputType').value;
+            const content = document.getElementById('inputContent').value;
+            
+            if (!content) return;
+            
+            const btn = document.querySelector('button');
+            btn.disabled = true;
+            btn.innerText = "Analyzing...";
+            
+            try {
+                const res = await fetch(`${API_URL}/parent/input`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, content })
+                });
+                const result = await res.json();
+                loadData(); // Refresh list
+                document.getElementById('inputContent').value = "";
+            } catch (e) {
+                alert("Error submitting input: " + e);
+            }
+            
+            btn.disabled = false;
+            btn.innerText = "Submit Directive";
+        }
+
+        function renderLog(items) {
+            const list = document.getElementById('logList');
+            list.innerHTML = items.map(item => `
+                <li class="log-item">
+                    <div class="log-header">
+                        <span class="tag ${item.status}">${item.type}</span>
+                        <span>${new Date(item.timestamp).toLocaleDateString()}</span>
+                    </div>
+                    <div class="log-content">"${item.content}"</div>
+                    <div class="log-response">Plan: ${item.alexa_response}</div>
+                </li>
+            `).join('');
+        }
+
+        // Init
+        loadData();
+    </script>
+</body>
+</html>

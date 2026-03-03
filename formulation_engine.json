@@ -1,0 +1,72 @@
+{
+  "name": "Ice Cream R&D",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "formulate",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        460,
+        460
+      ],
+      "webhookId": "formulation-engine-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all();"
+      },
+      "name": "Data Extraction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Advanced Ice Cream Formulation Logic (Matrix Solver - JS Version)\n// Inputs: target_fat (%), target_prot (%), batch_size (g)\n// Ingredients: Cream (40% F, 2.1% P), Milk (3.5% F, 3.4% P), MPC85 (1.5% F, 85% P)\n\n// Helper: 3x3 Determinant\nfunction det3(m) {\n  return (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -\n          m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +\n          m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]));\n}\n\n// Helper: Replace column for Cramer's Rule\nfunction replaceCol(m, c, b) {\n  const r = m.map(row => [...row]);\n  for (let i = 0; i < 3; i++) {\n    r[i][c] = b[i];\n  }\n  return r;\n}\n\nconst items = $input.all();\nconst output = [];\n\nfor (const item of items) {\n  const data = item.json;\n  const params = data.body || data;\n  const targetFat = parseFloat(params.target_fat || 16);\n  const targetProt = parseFloat(params.target_protein || 4.0);\n  const batchSize = parseFloat(params.batch_size || 1000);\n\n  // Fixed Solids\n  const mSucrose = batchSize * 0.12;\n  const mBrownSugar = batchSize * 0.03;\n  const mStab = batchSize * 0.005;\n  const mSolidsFixed = mSucrose + mBrownSugar + mStab;\n  const mAvailable = batchSize - mSolidsFixed;\n\n  const mFatTarget = batchSize * (targetFat / 100.0);\n  const mProtTarget = batchSize * (targetProt / 100.0);\n\n  // Matrix A coeffs\n  // Mc, Mm, Mmpc\n  // Eq 1: 1, 1, 1 (Mass)\n  // Eq 2: 0.40, 0.035, 0.015 (Fat)\n  // Eq 3: 0.021, 0.034, 0.85 (Prot)\n\n  const A = [\n    [1.0, 1.0, 1.0],\n    [0.40, 0.035, 0.015],\n    [0.021, 0.034, 0.85]\n  ];\n\n  const B = [mAvailable, mFatTarget, mProtTarget];\n\n  const D = det3(A);\n  \n  if (Math.abs(D) < 1e-9) {\n     output.push({json: {status: \"error\", message: \"Solver failed\"}});\n     continue;\n  }\n\n  const Mc = det3(replaceCol(A, 0, B)) / D;\n  const Mm = det3(replaceCol(A, 1, B)) / D;\n  const Mmpc = det3(replaceCol(A, 2, B)) / D;\n\n  const recipe = {\n    \"Heavy Cream (40%)\": parseFloat(Mc.toFixed(1)),\n    \"Whole Milk\": parseFloat(Mm.toFixed(1)),\n    \"Milk Protein Conc. (85%)\": parseFloat(Mmpc.toFixed(1)),\n    \"Cane Sugar\": parseFloat(mSucrose.toFixed(1)),\n    \"Brown Sugar\": parseFloat(mBrownSugar.toFixed(1)),\n    \"Stabilizer (Guar/LBG)\": parseFloat(mStab.toFixed(1))\n  };\n\n  output.push({json: {\n    status: \"success\", \n    recipe: recipe,\n    targets: {fat: targetFat, protein: targetProt}\n  }});\n}\n\nreturn output;\n"
+      },
+      "name": "Master Formulator",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        460
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Data Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Extraction": {
+      "main": [
+        [
+          {
+            "node": "Master Formulator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

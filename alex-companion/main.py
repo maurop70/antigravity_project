@@ -90,8 +90,10 @@ async def chat_endpoint(request: ChatRequest):
     Standard chat endpoint.
     """
     try:
+        print(f"[DEBUG] Chat request received: {request.message}")
         # Load active parent inputs and strategy to inject into context
         data = data_manager.load_data()
+        print("[DEBUG] Data loaded.")
         
         # Check for Classroom triggers (simple keyword check for now, or always inject if auth'd)
         # We'll inject it if it's explicitly asked or if we want to be proactive.
@@ -99,9 +101,13 @@ async def chat_endpoint(request: ChatRequest):
         # Actually, let's just fetch it. If it's slow, we might need caching.
         classroom_context = None
         if "homework" in request.message.lower() or "assignment" in request.message.lower() or "class" in request.message.lower() or "school" in request.message.lower():
+             print("[DEBUG] Fetching classroom context...")
              classroom_context = classroom_client.get_summary()
+             print("[DEBUG] Classroom context fetched.")
 
+        print("[DEBUG] Sending to Alexa Client...")
         response_text = alexa_client.send_message(request.message, user_data=data, local_context=classroom_context)
+        print(f"[DEBUG] Response received: {response_text[:30]}...")
         return ChatResponse(response=response_text)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -207,7 +213,32 @@ async def search_image_endpoint(request: SearchRequest):
     encoded_query = query.replace(" ", "%20")
     fallback_url = f"https://pollinations.ai/p/{encoded_query}?width=800&height=600&nologo=true"
     print(f"FALLBACK to Pollinations: {fallback_url}")
+    print(f"FALLBACK to Pollinations: {fallback_url}")
     return {"url": fallback_url}
+
+@app.post("/api/search_video")
+async def search_video_endpoint(request: SearchRequest):
+    """
+    Searches DuckDuckGo for a YouTube video.
+    """
+    # Force YouTube to ensure embeddability
+    query = request.query + " site:youtube.com"
+    print(f"Searching for video: {query}")
+    
+    try:
+        with DDGS() as ddgs:
+            # max_results=1 forces getting the top result
+            results = list(ddgs.videos(query, max_results=1))
+            if results and results[0].get('content'):
+                video_url = results[0]['content'] # content is usually the watch URL
+                print(f"FOUND video: {video_url}")
+                # If it's a YouTube URL, we might want to return the embed ID or just the URL
+                return {"url": video_url, "title": results[0].get('title', 'Video')}
+            
+    except Exception as e:
+        print(f"Video Search failed ({e}).")
+        
+    return {"url": None}
 
 @app.get("/api/auth/classroom")
 async def auth_classroom():
@@ -250,4 +281,4 @@ app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

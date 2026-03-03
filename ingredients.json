@@ -1,0 +1,39 @@
+[
+    {
+        "ingredient": "Glucose Syrup 42DE",
+        "specs": {
+            "dry_matter_percent": 80.0,
+            "dextrose_equivalent": 42.0,
+            "PAC": 0.80,
+            "POD": 0.50
+        },
+        "sugar_profile_dry_basis": {
+            "dextrose_dp1": 20.0,
+            "maltose_dp2": 14.0,
+            "maltotriose_dp3": 11.0,
+            "polysaccharides_dp4_plus": 55.0
+        }
+    },
+    {
+        "ingredient": "Milk Protein Concentrate 85",
+        "specs": {
+            "protein_dry_basis": 85.0,
+            "dry_matter_percent": 94.0,
+            "lactose": 5.5,
+            "ash": 7.5,
+            "fat": 2.0
+        }
+    },
+    {
+        "ingredient": "Sea Salt Caramel Ribbon",
+        "specs": {
+            "dry_matter_percent": 72.0,
+            "brix": 72.0,
+            "fat": 8.0,
+            "sugar": 55.0,
+            "PAC": 0.95,
+            "POD": 0.85
+        },
+        "notes": "Estimated based on Burnt Caramel Variegate proxy."
+    }
+]

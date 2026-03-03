@@ -1,0 +1,163 @@
+{
+    "name": "System - Drive Manager",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "drive-manager",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "name": "Webhook_Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "dataType": "string",
+                "value1": "={{ $json.body.action }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "ensure_folder",
+                            "output": 0
+                        },
+                        {
+                            "value2": "upload_file",
+                            "output": 1
+                        }
+                    ]
+                }
+            },
+            "name": "Action_Switch",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 1,
+            "position": [
+                300,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "resource": "folder",
+                "operation": "create",
+                "name": "={{ $json.body.folder_name }}",
+                "parentId": {
+                    "__rl": true,
+                    "value": "={{ $json.body.parent_path }}",
+                    "mode": "id"
+                },
+                "options": {}
+            },
+            "name": "GD_Create_Folder",
+            "type": "n8n-nodes-base.googleDrive",
+            "typeVersion": 2,
+            "position": [
+                600,
+                200
+            ],
+            "credentials": {
+                "googleDriveOAuth2Api": {
+                    "id": "YOUR_CREDENTIAL_ID_HERE",
+                    "name": "Google Drive account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "fileContent": "={{ $json.body.file_content }}",
+                "name": "={{ $json.body.file_name }}",
+                "parentId": {
+                    "__rl": true,
+                    "value": "={{ $json.body.parent_id }}",
+                    "mode": "id"
+                },
+                "options": {}
+            },
+            "name": "GD_Upload_File",
+            "type": "n8n-nodes-base.googleDrive",
+            "typeVersion": 2,
+            "position": [
+                600,
+                400
+            ],
+            "credentials": {
+                "googleDriveOAuth2Api": {
+                    "id": "YOUR_CREDENTIAL_ID_HERE",
+                    "name": "Google Drive account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ $json }}",
+                "options": {}
+            },
+            "name": "Response",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                900,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook_Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Action_Switch",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Action_Switch": {
+            "main": [
+                [
+                    {
+                        "node": "GD_Create_Folder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "GD_Upload_File",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "GD_Create_Folder": {
+            "main": [
+                [
+                    {
+                        "node": "Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "GD_Upload_File": {
+            "main": [
+                [
+                    {
+                        "node": "Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

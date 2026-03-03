@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alexa | Parent Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+
+<body class="dashboard-body">
+
+    <div class="dashboard-container">
+        <!-- Sidebar / Header -->
+        <header class="dashboard-header">
+            <div class="logo-area">
+                <img src="/icon.png" alt="Alexa Logo" class="db-logo">
+                <h1>Parent Dashboard</h1>
+            </div>
+            <p class="subtitle">Monitor progress & Guide Alexa's teaching</p>
+            <a href="/" class="back-link">← Back to Chat</a>
+        </header>
+
+        <!-- Main Content Grid -->
+        <main class="dashboard-grid">
+
+            <!-- LEFT COLUMN -->
+            <div class="dash-column">
+
+                <!-- 1. Knowledge Base Manager (Upload) -->
+                <section class="card input-card">
+                    <h2>Knowledge Base Manager</h2>
+                    <p style="color:#636e72; margin-bottom:15px; font-size:0.9rem;">Upload new learning materials here.
+                    </p>
+
+                    <div class="input-group">
+                        <label>Category (Level 1):</label>
+                        <input type="text" id="kb-category" list="category-list" placeholder="e.g. School, Hobbies">
+                        <datalist id="category-list"></datalist>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Topic (Level 2):</label>
+                        <input type="text" id="kb-topic" list="topic-list" placeholder="e.g. Biology, Ancient History">
+                        <datalist id="topic-list"></datalist>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Resource Assets (PDF, Docx, Text):</label>
+                        <input type="file" id="kb-file-upload" multiple>
+                    </div>
+
+                    <button id="upload-btn" class="action-btn" style="background-color: #6c5ce7;">Upload Assets</button>
+                    <div id="upload-status" class="hidden" style="margin-top:10px; font-size:0.9rem;"></div>
+                </section>
+
+                <!-- 2. Current Library (Tree) -->
+                <section class="card library-card" style="margin-top: 25px;">
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom: 2px solid #f1f2f6; padding-bottom: 10px;">
+                        <h2 style="margin:0; border:none; padding:0;">Current Library</h2>
+                        <button onclick="loadHierarchy()"
+                            style="background:none; border:none; color:#6c5ce7; cursor:pointer; font-weight:bold;">↻
+                            Refresh</button>
+                    </div>
+
+                    <div id="knowledge-tree" class="tree-container" style="max-height: 400px; overflow-y: auto;">
+                        <p style="color:#b2bec3;">Loading hierarchy...</p>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- RIGHT COLUMN -->
+            <div class="dash-column">
+
+                <!-- 1. Add Learning Goal -->
+                <section class="card input-card">
+                    <h2>Add Learning Goal or Comment</h2>
+                    <div class="input-group">
+                        <label>Type of Input:</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="inputType" value="vocabulary" checked> Vocabulary
+                                Word</label>
+                            <label><input type="radio" name="inputType" value="comment"> General Comment / Goal</label>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Content:</label>
+                        <textarea id="parent-input"
+                            placeholder="E.g., 'Teach him the word diligent' or 'Focus on using full sentences.'"></textarea>
+                    </div>
+                    <button id="submit-input-btn" class="action-btn">Submit to Alexa</button>
+                    <div id="loading-indicator" class="hidden">Parsing your request...</div>
+                </section>
+
+                <!-- 2. Alexa's Learning Plan (Feed) -->
+                <section class="card feed-card" style="margin-top: 25px;">
+                    <h2>Alexa's Learning Plan</h2>
+                    <div id="feed-container" class="feed-list">
+                        <!-- Dynamic Items -->
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- CHECKPOINT 2 -->
+            <!-- SECTION 3: PROGRESS LOG (Bottom Full Width) -->
+            <section class="card progress-card" style="grid-column: 1 / -1;">
+                <h2>User Progress Log</h2>
+                <div id="progress-container" class="feed-list">
+                    <p style="color:#636e72; padding:20px; text-align:center;">Alexa will add automatic daily summaries
+                        here as she interacts with him.</p>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        const feedContainer = document.getElementById('feed-container');
+        const submitBtn = document.getElementById('submit-input-btn');
+        const inputField = document.getElementById('parent-input');
+        const loadingIndicator = document.getElementById('loading-indicator');
+
+        // Load Data on Start
+        fetchData();
+        // Load Hierarchy on Start
+        loadHierarchy();
+
+        async function fetchData() {
+            try {
+                const res = await fetch('/api/parent/data');
+                const data = await res.json();
+                renderFeed(data.parent_inputs);
+                renderProgress(data.progress_log);
+            } catch (e) { console.error("Error fetching parent data", e); }
+        }
+
+        async function loadHierarchy() {
+            const treeContainer = document.getElementById('knowledge-tree');
+            const catList = document.getElementById('category-list');
+            const topicList = document.getElementById('topic-list');
+
+            treeContainer.innerHTML = '<p style="color:#b2bec3;">Loading...</p>';
+
+            try {
+                const res = await fetch('/api/knowledge_tree');
+                const tree = await res.json();
+
+                // Populate Browse Tree
+                let html = '';
+                if (Object.keys(tree).length === 0) {
+                    html = '<p style="color:#888; padding:10px;">No knowledge assets found.</p>';
+                } else {
+                    for (const [cat, topics] of Object.entries(tree)) {
+                        html += `<div style="margin-bottom:15px;">
+                                    <strong style="color:#2d3436; font-size:1.1rem;">📁 ${cat}</strong>
+                                    <ul style="padding-left:20px; margin-top:5px; color:#636e72; list-style-type: none;">`;
+                        topics.forEach(topic => {
+                            html += `<li style="margin-bottom:5px;">📄 ${topic}</li>`;
+                        });
+                        html += `</ul></div>`;
+                    }
+                }
+                treeContainer.innerHTML = html;
+
+                // Populate Datalists for Autocomplete
+                catList.innerHTML = '';
+                topicList.innerHTML = '';
+                Object.keys(tree).forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat;
+                    catList.appendChild(opt);
+
+                    // Add topics
+                    tree[cat].forEach(topic => {
+                        const tOpt = document.createElement('option');
+                        tOpt.value = topic;
+                        topicList.appendChild(tOpt);
+                    });
+                });
+
+            } catch (e) {
+                console.error(e);
+                treeContainer.innerHTML = 'Error loading hierarchy.';
+            }
+        }
+
+        function renderProgress(logs) {
+            const container = document.getElementById('progress-container');
+            if (!logs || logs.length === 0) return;
+
+            container.innerHTML = '';
+            logs.forEach(log => {
+                const el = document.createElement('div');
+                el.className = 'feed-item';
+                el.innerHTML = `
+                    <div class="feed-header">
+                        <span class="badge vocabulary">SESSION SUMMARY</span>
+                        <span class="date">${new Date(log.date).toLocaleString()}</span>
+                    </div>
+                    <div class="feed-body">
+                        <p class="parent-text">${log.note}</p>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function renderFeed(inputs) {
+            feedContainer.innerHTML = '';
+            if (!inputs) return;
+            inputs.forEach(item => {
+                const el = document.createElement('div');
+                el.className = `feed-item status-${item.status}`;
+                el.innerHTML = `
+                    <div class="feed-header">
+                        <span class="badge ${item.type}">${item.type.toUpperCase()}</span>
+                        <span class="date">${new Date(item.timestamp).toLocaleDateString()}</span>
+                    </div>
+                    <div class="feed-body">
+                        <p class="parent-text"><strong>You said:</strong> "${item.content}"</p>
+                        <div class="alexa-reply">
+                            <div class="alexa-avatar-small"></div>
+                            <p><strong>Alexa's Plan:</strong> ${item.alexa_response}</p>
+                        </div>
+                    </div>
+                    <div class="status-indicator">Status: ${item.status.toUpperCase()}</div>
+                `;
+                feedContainer.appendChild(el);
+            });
+        }
+
+        submitBtn.addEventListener('click', async () => {
+            const content = inputField.value.trim();
+            const type = document.querySelector('input[name="inputType"]:checked').value;
+
+            if (!content) return;
+
+            loadingIndicator.classList.remove('hidden');
+            submitBtn.disabled = true;
+
+            try {
+                const res = await fetch('/api/parent/input', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content, type })
+                });
+
+                if (res.ok) {
+                    inputField.value = '';
+                    fetchData(); // Refresh list
+                } else {
+                    alert("Error submitting input.");
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Upload Handler
+        const uploadBtn = document.getElementById('upload-btn');
+        const uploadStatus = document.getElementById('upload-status');
+
+        uploadBtn.addEventListener('click', async () => {
+            const category = document.getElementById('kb-category').value.trim();
+            const topic = document.getElementById('kb-topic').value.trim();
+            const fileBox = document.getElementById('kb-file-upload');
+
+            if (!category || !topic || fileBox.files.length === 0) {
+                alert("Please provide Category, Topic, and at least one File.");
+                return;
+            }
+
+            uploadBtn.disabled = true;
+            uploadBtn.innerText = "Uploading...";
+            uploadStatus.classList.remove('hidden');
+            uploadStatus.innerText = "Processing Files...";
+            uploadStatus.style.color = "#636e72";
+
+            let successCount = 0;
+            let errors = [];
+
+            // Handle Multiple Files sequentially
+            for (let i = 0; i < fileBox.files.length; i++) {
+                const file = fileBox.files[i];
+                const formData = new FormData();
+                formData.append('category', category);
+                formData.append('topic', topic);
+                formData.append('file', file);
+
+                try {
+                    const res = await fetch('/api/upload_knowledge', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!res.ok) throw new Error(`Failed to upload ${file.name}`);
+                    successCount++;
+                } catch (e) {
+                    errors.push(file.name);
+                }
+            }
+
+            if (successCount > 0) {
+                uploadStatus.innerText = `Success! Uploaded ${successCount} files to ${category} > ${topic}.`;
+                uploadStatus.style.color = "green";
+                // Clear inputs
+                document.getElementById('kb-category').value = '';
+                document.getElementById('kb-topic').value = '';
+                fileBox.value = '';
+                loadHierarchy(); // Refresh tree
+            } else {
+                uploadStatus.innerText = "Upload failed.";
+                uploadStatus.style.color = "red";
+            }
+
+            if (errors.length > 0) {
+                console.warn("Upload errors:", errors);
+            }
+
+            uploadBtn.disabled = false;
+            uploadBtn.innerText = "Upload Assets";
+        });
+    </script>
+</body>
+
+</html>

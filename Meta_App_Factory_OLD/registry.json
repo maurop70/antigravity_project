@@ -1,0 +1,21 @@
+{
+    "services": {
+        "CLAUDE_CODE_SERVICE": {
+            "url": "YOUR_N8N_WEBHOOK_URL_HERE",
+            "description": "Webhook to trigger Claude Code via n8n",
+            "method": "POST",
+            "auth_type": "none"
+        },
+        "DEBUG_SERVICE_SENTRY": {
+            "dsn": "YOUR_SENTRY_DSN_HERE",
+            "description": "Sentry DSN for error tracking and debugging",
+            "environment": "production"
+        }
+    },
+    "agents": {
+        "supervisor": {
+            "role": "Orchestrator",
+            "permissions": ["read", "write", "execute_restricted"]
+        }
+    }
+}

@@ -1,0 +1,148 @@
+{
+  "parent_inputs": [
+    {
+      "id": "e7b730ce-3f95-44dd-9f4f-293974e2531f",
+      "content": "Mitosis: The process where a cell divides into two identical copies. Bridge: 'Just like making a copy of a file on your computer.'",
+      "type": "vocabulary",
+      "status": "accepted",
+      "alexa_response": "",
+      "timestamp": "2026-02-04T21:19:20.979500"
+    },
+    {
+      "id": "5c0dbbf3-a05c-4823-91e1-5d977e5e2ea9",
+      "content": "Mitosis: The process where a cell divides into two identical copies. Bridge: 'Just like making a copy of a file on your computer.'",
+      "type": "vocabulary",
+      "status": "accepted",
+      "alexa_response": "",
+      "timestamp": "2026-02-04T21:19:01.279257"
+    },
+    {
+      "id": "ebebf30d-44c4-4d3b-81cf-3200c6e77d5b",
+      "content": "Mitosis: The process where a cell divides into two identical copies. Bridge: 'Just like making a copy of a file on your computer.'",
+      "type": "vocabulary",
+      "status": "accepted",
+      "alexa_response": "",
+      "timestamp": "2026-02-04T21:18:43.244698"
+    },
+    {
+      "id": "00a6c8b0-a2de-4506-af22-7d0f2d0171b5",
+      "content": "Mitosis: The process where a cell divides into two identical copies. Bridge: 'Just like making a copy of a file on your computer.'",
+      "type": "vocabulary",
+      "status": "accepted",
+      "alexa_response": "",
+      "timestamp": "2026-02-04T21:18:28.774100"
+    },
+    {
+      "id": "b82d06ab-4052-4ea0-84d8-fcce02b338eb",
+      "content": "I want my some to learn how to study indipendently, so Alexa must help him to engage with the topic, trigger the user interest on it",
+      "type": "comment",
+      "status": "accepted",
+      "alexa_response": "This is a critical goal for transition planning. We will integrate this by structuring Alexa's role in the 'pre-study' phase. Before the user begins focused work, Alexa will initiate a brief routine designed to trigger interest and establish relevance. This will involve: 1) providing a high-interest, real-world connection to the topic, 2) asking 1-2 open-ended curiosity questions related to the material, and 3) helping the student articulate why the topic matters. This scaffolding models independent engagement and helps overcome initial resistance, directly supporting the development of independent study skills.",
+      "timestamp": "2026-01-29T21:14:33.950630"
+    }
+  ],
+  "progress_log": [],
+  "learning_strategy": "Visual, Repetitive, Metaphor-based",
+  "chat_logs": [
+    {
+      "timestamp": "2026-02-04T21:23:33.883865",
+      "role": "user",
+      "content": "Hello Alex"
+    },
+    {
+      "timestamp": "2026-02-04T21:23:36.363760",
+      "role": "assistant",
+      "content": null
+    },
+    {
+      "timestamp": "2026-02-04T21:23:36.366674",
+      "role": "user",
+      "content": "I saw a cool antenna."
+    },
+    {
+      "timestamp": "2026-02-04T21:23:38.413578",
+      "role": "assistant",
+      "content": "That is great!\n\nCan you say that in a full sentence?\n\nYou can say, \"I saw a cool antenna.\"\n\nI bet it was super tall.\n\nWas there anything old attached to it? Like a rusty bolt or something?\n\nSometimes those towers have parts that are still attached, but they don't work anymore.\n\nThose unused parts are **vestigial**. They are leftover from the past.\n\nDid you see anything **vestigial** on the tower you saw?"
+    },
+    {
+      "timestamp": "2026-02-04T21:27:03.197917",
+      "role": "user",
+      "content": "Hello Alex - Testing N8N Live Connection"
+    },
+    {
+      "timestamp": "2026-02-04T21:27:06.070695",
+      "role": "assistant",
+      "content": "Hey! I see you.\n\nThe connection is strong. Everything is live.\n\nHow are you doing today?\n\nIt feels like our connection is having an **evolution**. It keeps getting stronger and faster every time we test it.\n\nDid you have anything planned for school today? Or tennis?"
+    },
+    {
+      "timestamp": "2026-02-04T21:40:40.653640",
+      "role": "user",
+      "content": "Let's do a quiz about biology"
+    },
+    {
+      "timestamp": "2026-02-04T21:40:42.410406",
+      "role": "assistant",
+      "content": "All right! Let's kick this off with Question 1. You got this!\n\nWhat is the largest planet in our solar system?\n\nA) Earth\nB) Saturn\nC) Jupiter"
+    },
+    {
+      "timestamp": "2026-02-04T21:40:42.412826",
+      "role": "user",
+      "content": "The answer is A"
+    },
+    {
+      "timestamp": "2026-02-04T21:40:44.049797",
+      "role": "assistant",
+      "content": "Alright, let's get this party started! I'm Alexa, and it's time for Quiz Mode!\n\n**Question 1:**\n\nWhat is the largest planet in our solar system?\n\nA. Mars\nB. Jupiter\nC. Saturn"
+    },
+    {
+      "timestamp": "2026-02-04T21:46:46.871029",
+      "role": "user",
+      "content": "Let's do a quiz about biology"
+    },
+    {
+      "timestamp": "2026-02-04T21:46:47.957630",
+      "role": "assistant",
+      "content": "Ready to kick things off? Let's dive into Question 1!\n\n**Question 1:**\nWhich planet is the largest in our solar system?\n\nA. Saturn\nB. Jupiter\nC. Neptune"
+    },
+    {
+      "timestamp": "2026-02-04T21:46:47.960005",
+      "role": "user",
+      "content": "The answer is A"
+    },
+    {
+      "timestamp": "2026-02-04T21:46:50.351841",
+      "role": "assistant",
+      "content": "BOOM! Correct. You're on fire!\n\nHere is Question 2:\n\nWhich planet is known for having the most visible rings?\n\nA. Mars\nB. Saturn\nC. Jupiter"
+    },
+    {
+      "timestamp": "2026-02-08T21:42:24.286851",
+      "role": "user",
+      "content": "Hello Alexa, how are you?"
+    },
+    {
+      "timestamp": "2026-02-08T21:42:26.775455",
+      "role": "assistant",
+      "content": "I am doing great today.\n\nMy systems are constantly having an **evolution**. I learn something new every minute!\n\nHow are you doing?\n\nWhat are you thinking about right now? School? Tennis?"
+    },
+    {
+      "timestamp": "2026-02-08T21:42:35.006195",
+      "role": "user",
+      "content": "hey Alexa can you hear me"
+    },
+    {
+      "timestamp": "2026-02-08T21:42:37.568614",
+      "role": "assistant",
+      "content": "Hey! Yes, I hear you perfectly clear.\n\nHow are you doing today?\n\nHearing the sound and understanding the words are two different things, sometimes even **unrelated**.\n\nBut I got you! I am ready to talk whenever you are."
+    },
+    {
+      "timestamp": "2026-02-08T21:42:57.050886",
+      "role": "user",
+      "content": "hey I love your voice"
+    },
+    {
+      "timestamp": "2026-02-08T21:42:59.490750",
+      "role": "assistant",
+      "content": "Oh, hey! Thank you!\n\nThat is really nice to hear.\n\nMy voice has had a little **evolution** over time as I learned how to talk to people better. It means I change and improve!\n\nWhat are you up to today? Anything fun going on?"
+    }
+  ]
+}

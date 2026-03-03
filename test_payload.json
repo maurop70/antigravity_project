@@ -1,0 +1,5 @@
+{
+    "target_fat": 16,
+    "target_protein": 10,
+    "batch_size": 1000
+}

@@ -14,7 +14,7 @@ genai.configure(api_key=API_KEY)
 
 class AlexaClient:
     def __init__(self):
-        self.model = genai.GenerativeModel('gemini-flash-latest')
+        self.model = genai.GenerativeModel('gemini-2.5-flash')
         self.chat = None
         self.system_instruction = self._load_system_instruction()
         self._init_chat()
@@ -40,7 +40,7 @@ class AlexaClient:
         # We'll try to use the system_instruction argument if available (newer SDK compliant).
         
         try:
-             self.model = genai.GenerativeModel('gemini-flash-latest', system_instruction=self.system_instruction)
+             self.model = genai.GenerativeModel('gemini-2.5-flash', system_instruction=self.system_instruction)
              self.chat = self.model.start_chat(history=[])
         except Exception:
             # Fallback for older SDKs or models without explicit system_instruction param

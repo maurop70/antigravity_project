@@ -1,0 +1,6 @@
+{
+    "target_fat": 12,
+    "target_protein": 10,
+    "batch_size": 1000,
+    "recipe_id": "mock_loki_v1_id"
+}

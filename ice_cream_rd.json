@@ -1,0 +1,164 @@
+{
+  "name": "Ice Cream R&D",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "formulate",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        460,
+        460
+      ],
+      "webhookId": "formulation-engine-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all();"
+      },
+      "name": "Data Extraction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst inputs = $input.all();\nconst item = inputs[0]; \nconst params = item.json.body || item.json;\nconst targetFat = parseFloat(params.target_fat || 16);\nconst targetProt = parseFloat(params.target_protein || 10);\nconst batchSize = parseFloat(params.batch_size || 1000);\nconst recipeId = params.recipe_id || \"mock_recipal_id_99\";\n\nconst INGREDIENTS = [{\"ingredient\": \"Glucose Syrup 42DE\", \"specs\": {\"dry_matter_percent\": 80.0, \"dextrose_equivalent\": 42.0, \"PAC\": 0.8, \"POD\": 0.5}, \"sugar_profile_dry_basis\": {\"dextrose_dp1\": 20.0, \"maltose_dp2\": 14.0, \"maltotriose_dp3\": 11.0, \"polysaccharides_dp4_plus\": 55.0}}, {\"ingredient\": \"Milk Protein Concentrate 85\", \"specs\": {\"protein_dry_basis\": 85.0, \"dry_matter_percent\": 94.0, \"lactose\": 5.5, \"ash\": 7.5, \"fat\": 2.0}}, {\"ingredient\": \"Sea Salt Caramel Ribbon\", \"specs\": {\"dry_matter_percent\": 72.0, \"brix\": 72.0, \"fat\": 8.0, \"sugar\": 55.0, \"PAC\": 0.95, \"POD\": 0.85}, \"notes\": \"Estimated based on Burnt Caramel Variegate proxy.\"}];\n\nfunction det3(m) {\n  return (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -\n          m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +\n          m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]));\n}\n\nfunction replaceCol(m, c, b) {\n  const r = m.map(row => [...row]);\n  for (let i = 0; i < 3; i++) { r[i][c] = b[i]; }\n  return r;\n}\n\nconst P_fat_c = 40.0; const P_prot_c = 2.1;\nconst P_fat_m = 3.5;  const P_prot_m = 3.4;\nconst P_fat_mpc = 2.0; const P_prot_mpc = 85.0;\n\nconst mSucrose = batchSize * 0.12;\nconst mBrownSugar = batchSize * 0.03;\nconst mStab = batchSize * 0.005;\nconst mFixed = mSucrose + mBrownSugar + mStab;\nconst mAvailable = batchSize - mFixed;\n\nconst mFatTarget = batchSize * (targetFat / 100.0);\nconst mProtTarget = batchSize * (targetProt / 100.0);\n\nconst A = [\n    [1.0, 1.0, 1.0],\n    [P_fat_c/100, P_fat_m/100, P_fat_mpc/100],\n    [P_prot_c/100, P_prot_m/100, P_prot_mpc/100]\n];\nconst B = [mAvailable, mFatTarget, mProtTarget];\nconst D = det3(A);\n\nif (Math.abs(D) < 1e-9) return [{json: {status: \"error\"}}];\n\nconst Mc = det3(replaceCol(A, 0, B)) / D;\nconst Mm = det3(replaceCol(A, 1, B)) / D;\nconst Mmpc = det3(replaceCol(A, 2, B)) / D;\n\nreturn [{json: {\n    status: \"success\",\n    recipe_id: recipeId,\n    recipe: {\n        \"Heavy Cream (40%)\": parseFloat(Mc.toFixed(1)),\n        \"Whole Milk\": parseFloat(Mm.toFixed(1)),\n        \"Milk Protein Conc. (85%)\": parseFloat(Mmpc.toFixed(1)),\n        \"Cane Sugar\": parseFloat(mSucrose.toFixed(1)),\n        \"Brown Sugar\": parseFloat(mBrownSugar.toFixed(1)),\n        \"Stabilizer\": parseFloat(mStab.toFixed(1))\n    }\n}}];\n"
+      },
+      "name": "Master Formulator",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.recipal.com/api/v1/labels/render",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token 07300c3d005faf10b01a9103ca2fd0b1"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "recipe_id",
+              "value": "={{ $json.recipe_id }}"
+            },
+            {
+              "name": "format",
+              "value": "png"
+            },
+            {
+              "name": "language",
+              "value": "en-US"
+            }
+          ]
+        },
+        "responseFormat": "file",
+        "options": {}
+      },
+      "name": "ReciPal Label Generator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1120,
+        460
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "create",
+        "name": "={{ 'Loki_Report_' + new Date().toISOString() }}",
+        "parents": [
+          "1zXiHNYNEfLTJvwinwqmu9nqtKCSd4n_w"
+        ],
+        "content": "={{ '# Loki R&D Report\\n\\nMade by Antigravity\\n\\n' + JSON.stringify($('Master Formulator').item.json.recipe, null, 2) }}",
+        "mimeType": "application/vnd.google-apps.document",
+        "options": {}
+      },
+      "name": "Save to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        460
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "6",
+          "name": "Google Drive Account 6"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Data Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Extraction": {
+      "main": [
+        [
+          {
+            "node": "Master Formulator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Master Formulator": {
+      "main": [
+        [
+          {
+            "node": "ReciPal Label Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReciPal Label Generator": {
+      "main": [
+        [
+          {
+            "node": "Save to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,77 @@
+{
+    "name": "Alex Insight Engine",
+    "settings": {},
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "alex-insight-live",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                0,
+                0
+            ],
+            "id": "webhook-trigger",
+            "name": "Alex Webhook",
+            "webhookId": "7f7f7f7f-7f7f-7f7f-7f7f-7f7f7f7f7f7f"
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o",
+                "prompt": "You are an educational psychologist analyzing a chat log between a student with APD and their AI tutor, Alex.\n\nInput:\n{{ $json.body.logs }}\n\nTask:\n1. Identify new vocabulary words the student encountered/used.\n2. Summarize key concepts mastered (look for 'Teach-Back' success).\n3. Flag any frustration or emotional struggles.\n\nOutput Format (HTML):\n<h3>Weekly Insight</h3>\n<ul><li>...</li></ul>",
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1,
+            "position": [
+                200,
+                0
+            ],
+            "id": "llm-analysis",
+            "name": "AI Insight Agent"
+        },
+        {
+            "parameters": {
+                "fromEmail": "alex@insight.ai",
+                "toEmail": "parent@example.com",
+                "subject": "Alex Progress Report",
+                "html": "={{ $json.text }}"
+            },
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 1,
+            "position": [
+                400,
+                0
+            ],
+            "id": "email-sender",
+            "name": "Send Report"
+        }
+    ],
+    "connections": {
+        "Alex Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "AI Insight Agent",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI Insight Agent": {
+            "main": [
+                [
+                    {
+                        "node": "Send Report",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}
